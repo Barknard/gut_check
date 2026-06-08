@@ -1,0 +1,21 @@
+{
+  "enabled": true,
+  "max_suggestions_per_turn": 1,
+  "teach_depth": "brief",
+  "quiet": false,
+  "show_how_others": true,
+  "detectors": {
+    "memory":          { "enabled": true, "min_repeats": 2 },
+    "skill":           { "enabled": true, "min_repeats": 3 },
+    "subagent":        { "enabled": true },
+    "hook":            { "enabled": true, "min_repeats": 2 },
+    "slash_command":   { "enabled": true, "min_repeats": 3 },
+    "mcp":             { "enabled": true },
+    "automatable_goal":{ "enabled": true }
+  },
+  "collective": { "enabled": false },
+  "_relevance_gate": "never repeat what the user has adopted or declined; only surface net-new gains",
+  "adopted": [],
+  "declined": [],
+  "dismissed": []
+}

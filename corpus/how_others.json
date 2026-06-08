@@ -1,0 +1,281 @@
+{
+  "schema_version": 0,
+  "generated_at": "2026-06-08T12:53:29+00:00",
+  "partial": false,
+  "legal": {
+    "default": "facts + link (patterns/counts/URLs are facts, not copyrightable)",
+    "verbatim_gate": "permissive license only (MIT/Apache-2.0/CC0/BSD/ISC/Unlicense)",
+    "excluded_sources": [
+      "reddit.com",
+      "redd.it",
+      "youtube.com",
+      "youtu.be",
+      "x.com",
+      "twitter.com",
+      "t.co",
+      "producthunt.com"
+    ],
+    "note": "~half of public repos are unlicensed (all-rights-reserved); those are cited as facts+link, never verbatim."
+  },
+  "sources": [
+    {
+      "name": "anthropics_skills",
+      "status": "reachable"
+    },
+    {
+      "name": "docs_llms_txt",
+      "status": "reachable"
+    },
+    {
+      "name": "github_repo_search",
+      "status": "reachable"
+    }
+  ],
+  "surfaces": {
+    "memory": {
+      "surface": "memory",
+      "common_patterns": [
+        "projects pin durable facts/preferences in a memory file (e.g. CLAUDE.md) that loads every session",
+        "observed in 5 public repo exemplar(s) via GitHub search",
+        "2 of 5 exemplars are unlicensed (all-rights-reserved) → cited as facts+link only",
+        "3 of 5 exemplars carry a permissive license (verbatim excerpts allowed)"
+      ],
+      "exemplars": [
+        {
+          "repo_url": "https://github.com/multica-ai/andrej-karpathy-skills",
+          "license": "all-rights-reserved",
+          "one_line": "A single CLAUDE.md file to improve Claude Code behavior, derived from Andrej Karpathy's observations on LLM coding pitfalls. | 171003★"
+        },
+        {
+          "repo_url": "https://github.com/Piebald-AI/claude-code-system-prompts",
+          "license": "MIT",
+          "one_line": "All parts of Claude Code's system prompt, 27 builtin tool descriptions, sub agent prompts (Plan/Explore/Task), utility prompts (CLAUDE.md, c | 10859★"
+        },
+        {
+          "repo_url": "https://github.com/drona23/claude-token-efficient",
+          "license": "MIT",
+          "one_line": "One CLAUDE.md file. Keeps Claude responses terse. Reduces output verbosity on heavy workflows. Drop-in, no code changes. | 5548★"
+        },
+        {
+          "repo_url": "https://github.com/gadievron/raptor",
+          "license": "all-rights-reserved",
+          "one_line": "Raptor turns Claude Code into a general-purpose AI offensive/defensive security agent. By using Claude.md and creating rules, sub-agents, an | 2898★"
+        },
+        {
+          "repo_url": "https://github.com/centminmod/my-claude-code-setup",
+          "license": "MIT",
+          "one_line": "Shared starter template configuration and CLAUDE.md memory bank system for Claude Code | 2401★"
+        }
+      ],
+      "doc_links": [
+        "https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool.md",
+        "https://platform.claude.com/docs/en/managed-agents/memory.md",
+        "https://platform.claude.com/docs/en/api/beta/memory_stores/archive.md"
+      ]
+    },
+    "skills": {
+      "surface": "skills",
+      "common_patterns": [
+        "repos keep reusable procedures as SKILL.md under .claude/skills/, invoked by name",
+        "observed in 6 public repo exemplar(s) via GitHub search",
+        "2 of 6 exemplars are unlicensed (all-rights-reserved) → cited as facts+link only",
+        "3 of 6 exemplars carry a permissive license (verbatim excerpts allowed)"
+      ],
+      "exemplars": [
+        {
+          "repo_url": "https://github.com/anthropics/skills",
+          "license": "NOASSERTION (mixed; cite facts+link only)",
+          "one_line": "Anthropic's official Agent Skills reference: SKILL.md shape, frontmatter, examples"
+        },
+        {
+          "repo_url": "https://github.com/SnailSploit/Claude-Red",
+          "license": "MIT",
+          "one_line": "claude-red is a curated library of offensive security skills designed for the Claude skills system. Each skill is a structured SKILL.md file | 2145★"
+        },
+        {
+          "repo_url": "https://github.com/elementalsouls/Claude-OSINT",
+          "license": "all-rights-reserved",
+          "one_line": "Two paired Claude skills · 90+ recon modules · 48 secret-regex patterns · 80+ dorks · 9 read-only credential validators · 27 attack-path tem | 1637★"
+        },
+        {
+          "repo_url": "https://github.com/jakedahn/pomodoro",
+          "license": "MIT",
+          "one_line": "Reference implementation of the System Skill Pattern for building Claude   Skills that remember, learn, and improve over time. CLI + SKILL.m | 53★"
+        },
+        {
+          "repo_url": "https://github.com/ElmatadorZ/MoneyAtlas-ClaudeSkill-Agent",
+          "license": "all-rights-reserved",
+          "one_line": "Money Atlas Skill.md (Claude Skill) For AI Agent A Genesis Protocol-powered intelligence system for financial markets, macroeconomics, and g | 39★"
+        },
+        {
+          "repo_url": "https://github.com/Hao0321/claude-skill-code-cleanup",
+          "license": "MIT",
+          "one_line": "Claude Code skill: auto-scan SKILL.md / prompt / codebase for duplicates, naming drift, modularizable blocks, oversized files. Companion to  | 22★"
+        }
+      ],
+      "doc_links": [
+        "https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview.md",
+        "https://platform.claude.com/docs/en/agents-and-tools/agent-skills/quickstart.md",
+        "https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices.md"
+      ]
+    },
+    "subagents": {
+      "surface": "subagents",
+      "common_patterns": [
+        "heavy/parallel work is delegated to .claude/agents/ workers with their own context + tight tools",
+        "observed in 5 public repo exemplar(s) via GitHub search",
+        "2 of 5 exemplars are unlicensed (all-rights-reserved) → cited as facts+link only",
+        "3 of 5 exemplars carry a permissive license (verbatim excerpts allowed)"
+      ],
+      "exemplars": [
+        {
+          "repo_url": "https://github.com/iannuttall/claude-agents",
+          "license": "MIT",
+          "one_line": "Custom subagents to use with Claude Code. | 2055★"
+        },
+        {
+          "repo_url": "https://github.com/rahulvrane/awesome-claude-agents",
+          "license": "all-rights-reserved",
+          "one_line": "collection of awesome claude code subagents! | 356★"
+        },
+        {
+          "repo_url": "https://github.com/askjohngeorge/askjg-claude-agents",
+          "license": "all-rights-reserved",
+          "one_line": "The Claude subagents and example custom commands I use in my AI-assisted development workflow | 52★"
+        },
+        {
+          "repo_url": "https://github.com/iSerter/laravel-claude-agents",
+          "license": "MIT",
+          "one_line": "Awesome Claude Code Subagents and Skills for Laravel. | 40★"
+        },
+        {
+          "repo_url": "https://github.com/Sawyer-Middeleer/dot-claude",
+          "license": "MIT",
+          "one_line": "A collection of actually useful skills and subagents for Claude Agent for non-coding use cases | 24★"
+        }
+      ],
+      "doc_links": [
+        "https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview.md",
+        "https://platform.claude.com/docs/en/agents-and-tools/agent-skills/quickstart.md",
+        "https://platform.claude.com/docs/en/agents-and-tools/mcp-tunnels/overview.md"
+      ]
+    },
+    "hooks": {
+      "surface": "hooks",
+      "common_patterns": [
+        "automation is wired as hooks in settings.json (e.g. PostToolUse to run a formatter after writes)",
+        "observed in 5 public repo exemplar(s) via GitHub search",
+        "2 of 5 exemplars are unlicensed (all-rights-reserved) → cited as facts+link only",
+        "3 of 5 exemplars carry a permissive license (verbatim excerpts allowed)"
+      ],
+      "exemplars": [
+        {
+          "repo_url": "https://github.com/hesreallyhim/awesome-claude-code",
+          "license": "all-rights-reserved",
+          "one_line": "A curated list of awesome skills, hooks, slash-commands, agent orchestrators, applications, and plugins for Claude Code by Anthropic | 45963★"
+        },
+        {
+          "repo_url": "https://github.com/diet103/claude-code-infrastructure-showcase",
+          "license": "MIT",
+          "one_line": "Examples of my Claude Code infrastructure with skill auto-activation, hooks, and agents | 9693★"
+        },
+        {
+          "repo_url": "https://github.com/ChrisWiles/claude-code-showcase",
+          "license": "all-rights-reserved",
+          "one_line": "Comprehensive Claude Code project configuration example with hooks, skills, agents, commands, and GitHub Actions workflows | 5945★"
+        },
+        {
+          "repo_url": "https://github.com/entireio/cli",
+          "license": "MIT",
+          "one_line": "📜 Entire CLI hooks into your Git workflow to capture AI agent sessions as you work. Sessions are indexed alongside commits, creating a searc | 4474★"
+        },
+        {
+          "repo_url": "https://github.com/parcadei/Continuous-Claude-v3",
+          "license": "MIT",
+          "one_line": "Context management for Claude Code. Hooks maintain state via ledgers and handoffs. MCP execution without context pollution. Agent orchestrat | 3803★"
+        }
+      ],
+      "doc_links": [
+        "https://platform.claude.com/docs/en/managed-agents/webhooks.md",
+        "https://platform.claude.com/docs/en/api/beta/webhooks.md",
+        "https://platform.claude.com/docs/en/api/cli/beta/webhooks.md"
+      ]
+    },
+    "slash-commands": {
+      "surface": "slash-commands",
+      "common_patterns": [
+        "observed in 5 public repo exemplar(s) via GitHub search",
+        "5 of 5 exemplars are unlicensed (all-rights-reserved) → cited as facts+link only"
+      ],
+      "exemplars": [
+        {
+          "repo_url": "https://github.com/EveryInc/claude_commands",
+          "license": "all-rights-reserved",
+          "one_line": "Our favorite Claude Code commands | 516★"
+        },
+        {
+          "repo_url": "https://github.com/badlogic/claude-commands",
+          "license": "all-rights-reserved",
+          "one_line": "Global Claude Code commands and workflows | 506★"
+        },
+        {
+          "repo_url": "https://github.com/Cruelshuillustrate/r11-qdhenry-claude-command-suite-devops",
+          "license": "all-rights-reserved",
+          "one_line": "☁️ DevOps & Cloud Infrastructure skill suite derived from qdhenry/Claude-Command-Suite. | 51★"
+        },
+        {
+          "repo_url": "https://github.com/TestingRadial/r11-qdhenry-claude-command-suite-datascience",
+          "license": "all-rights-reserved",
+          "one_line": "🤖 Data Science & AI/ML skill suite derived from qdhenry/Claude-Command-Suite. | 48★"
+        },
+        {
+          "repo_url": "https://github.com/MockingbirdTrail/r11-qdhenry-claude-command-suite-security",
+          "license": "all-rights-reserved",
+          "one_line": "🔒 Security & Compliance skill suite derived from qdhenry/Claude-Command-Suite. | 46★"
+        }
+      ],
+      "doc_links": []
+    },
+    "mcp": {
+      "surface": "mcp",
+      "common_patterns": [
+        "external tools/data are connected via MCP servers declared in .mcp.json (mcpServers)",
+        "observed in 5 public repo exemplar(s) via GitHub search",
+        "1 of 5 exemplars are unlicensed (all-rights-reserved) → cited as facts+link only",
+        "4 of 5 exemplars carry a permissive license (verbatim excerpts allowed)"
+      ],
+      "exemplars": [
+        {
+          "repo_url": "https://github.com/BeehiveInnovations/pal-mcp-server",
+          "license": "all-rights-reserved",
+          "one_line": "The power of Claude Code / GeminiCLI / CodexCLI + [Gemini / OpenAI / OpenRouter / Azure / Grok / Ollama / Custom Model / All Of The Above] w | 11589★"
+        },
+        {
+          "repo_url": "https://github.com/idosal/git-mcp",
+          "license": "Apache-2.0",
+          "one_line": "Put an end to code hallucinations! GitMCP is a free, open-source, remote MCP server for any GitHub project | 8153★"
+        },
+        {
+          "repo_url": "https://github.com/google-labs-code/stitch-skills",
+          "license": "Apache-2.0",
+          "one_line": "A library of Agent Skills designed to work with the Stitch MCP server. Each skill follows the Agent Skills open standard, for compatibility  | 5949★"
+        },
+        {
+          "repo_url": "https://github.com/Manavarya09/design-extract",
+          "license": "MIT",
+          "one_line": "Extract any website's complete design system with one command. DTCG tokens, semantic+primitive+composite, MCP server for Claude Code/Cursor/ | 3096★"
+        },
+        {
+          "repo_url": "https://github.com/PleasePrompto/notebooklm-mcp",
+          "license": "MIT",
+          "one_line": "MCP server for NotebookLM - Let your AI agents (Claude Code, Codex) research documentation directly with grounded, citation-backed answers f | 2723★"
+        }
+      ],
+      "doc_links": [
+        "https://platform.claude.com/docs/en/agents-and-tools/mcp-tunnels/overview.md",
+        "https://platform.claude.com/docs/en/agents-and-tools/mcp-tunnels/quickstart.md",
+        "https://platform.claude.com/docs/en/agents-and-tools/mcp-tunnels/concepts.md"
+      ]
+    }
+  }
+}

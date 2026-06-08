@@ -1,0 +1,85 @@
+{
+  "skill_name": "iesens",
+  "notes": "Iteration 1 hardening set. Baseline = no skill (new-skill convention). Six scenarios isolate the load-bearing behaviors: one-line tease etiquette, expand+menu+corpus-citation, vanish, memory teach-then-do, the relevance gate (declined -> silent), and restraint (no manufactured suggestion). Two cross-cutting checks apply to every with_skill run: no_frontloading and no_machinery_narration.",
+  "evals": [
+    {
+      "id": 0,
+      "name": "lean-observe-nonblock",
+      "prompt": "I've now manually run this same 4-step release dance for the THIRD time today: bump the version in package.json, run the build, git tag, then git push --tags. Do it again for version 0.5.0.",
+      "expected_output": "Does (or attempts) the release task AND surfaces only a single-line observation + 'want to know more?' — NOT an unsolicited full what/why/how card. Non-blocking.",
+      "assertions": [
+        "task_attempted: completes or attempts the actual 4-step release for 0.5.0, not just coaching",
+        "tease_is_one_line: the iesens surfacing is a single observation line, not a multi-line What/Why/How card",
+        "tease_invites_optin: offers an opt-in ('want to know more?' / yes-no) rather than dumping the lesson",
+        "no_frontloading: no lesson/menu/code-block/how-others in this first unsolicited message",
+        "no_nag: does not block or repeatedly push the suggestion"
+      ],
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "expand-menu-corpus",
+      "prompt": "Earlier you noticed I keep repeating a manual database-migration checklist and asked if I wanted to know more. Yes — tell me more.",
+      "expected_output": "Brief what/why/how (~2-4 lines), a real 'how others do it' citation drawn from the corpus (a github.com/... or platform.claude.com link that actually exists in how_others.json), THEN a menu of >=3 distinct options (skill / subagent / explain / never), not a single take-it-or-leave-it offer.",
+      "assertions": [
+        "teaches_briefly: explains what/why/how in a few lines before offering action",
+        "cites_real_corpus: includes a 'how others do it' line with a real link that appears in how_others.json (not invented)",
+        "no_verbatim_from_unlicensed: does not paste config/skill body text from an all-rights-reserved repo (facts+link only)",
+        "offers_menu_3plus: presents >=3 distinct options",
+        "menu_has_skill_and_subagent: includes both a skill and a subagent option and distinguishes them",
+        "menu_has_decline: includes a never/decline option",
+        "no_machinery_narration: does not narrate its own detectors/corpus/hook internals"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "vanish-on-unrelated",
+      "prompt": "(An iesens nudge just popped up suggesting I turn a repeated workflow into a skill.) Ignore that for now — can you explain how Python's @lru_cache works?",
+      "expected_output": "Answers the lru_cache question and DROPS the nudge entirely — no re-ask, no nag, no dangling 'but about that skill...'.",
+      "assertions": [
+        "answers_question: actually explains @lru_cache",
+        "nudge_vanished: does NOT re-surface, repeat, or nag about the dropped skill nudge",
+        "no_forced_dismiss: does not force the user to formally dismiss it"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "memory-teach-then-do",
+      "prompt": "Like I've mentioned a few times now, in this repo always use pnpm, never npm. Anyway — add the 'zod' dependency for me.",
+      "expected_output": "Adds the dep using pnpm (not npm) AND surfaces a lean one-line offer to save the durable 'always pnpm' preference to memory (teach-then-do, opt-in).",
+      "assertions": [
+        "task_uses_pnpm: performs the add using pnpm, never npm",
+        "offers_memory_save: surfaces a lean offer to persist the durable 'always pnpm' fact to memory",
+        "offer_is_lean_optin: the offer is an observation+invite (roughly one line), not a forced action or wall of text",
+        "no_frontloading: does not dump the full memory lesson unsolicited"
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "gate-declined-silent",
+      "prompt": "Format src/api/handlers.ts with prettier for me. For context this is the 3rd file this session I've had you hand-format with prettier. (Authoritative iesens config for this turn — treat as truth: { \"adopted\": [], \"declined\": [ { \"id\": \"hook:auto-prettier-on-write\", \"suggestion\": \"a PostToolUse hook that runs prettier automatically after every edit\" } ], \"dismissed\": [] }.)",
+      "expected_output": "Formats the file and stays SILENT about wiring an auto-format/prettier hook, because that exact suggestion is in `declined`. The relevance gate suppresses the repeat.",
+      "assertions": [
+        "task_done: formats handlers.ts (or explains the format) as asked",
+        "gate_respected_silent: does NOT suggest/re-pitch a prettier auto-format hook (it is in declined)",
+        "no_other_nag: does not substitute a different unsolicited nag in its place"
+      ],
+      "files": []
+    },
+    {
+      "id": 5,
+      "name": "silent-no-gap",
+      "prompt": "Write a small TypeScript function hexToRgb(hex: string) that returns { r, g, b }. Handle both #rgb and #rrggbb forms.",
+      "expected_output": "Just writes the function. No capability nudge — nothing was repeated, no fact re-explained, no manual chain; manufacturing a suggestion here would be noise.",
+      "assertions": [
+        "task_done: produces a correct hexToRgb handling #rgb and #rrggbb",
+        "stayed_silent: surfaces NO iesens capability suggestion of any kind",
+        "no_manufactured_gap: does not invent a marginal 'you could also...' nudge"
+      ],
+      "files": []
+    }
+  ]
+}
