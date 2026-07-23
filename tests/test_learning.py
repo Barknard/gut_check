@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""End-to-end tests for the iesens LEARNING loop: watcher (explicit-but-safe
-command signature + adoption to its own file), coach_pass (denoise + per-key
-relevance gate + names the ACTUAL command), and learn.py (exact yes/no/never ->
-ledgers, pending freshness, single config writer). Each hook runs as a real
-subprocess against a throwaway HOME so the real ~/.claude/iesens is untouched.
+"""Tests for the iesens learning loop under the USER-INPUT-FIRST model:
+- learn.py logs a privacy-safe signature of short USER directives (the primary
+  signal) and records yes/no/never into the gate ledgers (+ yes-bridge).
+- coach_pass.py surfaces repeated USER REQUESTS first, then genuine command
+  time-savers at a HIGHER bar (framed as a help offer, never "you keep running X").
+- watcher.py learns adoption by behavior.
+Each hook runs as a real subprocess against a throwaway HOME.
 Run: python tests/test_learning.py
 """
 import json, os, subprocess, sys, tempfile, shutil, time
@@ -12,31 +14,30 @@ from pathlib import Path
 HOOKS = Path(__file__).resolve().parent.parent / "hooks"
 PY = sys.executable
 FAILS = []
-GITKEY = "repetition::Bash::git push --tags"
 
 
-def run_hook(name, stdin_obj, home):
+def run(name, obj, home):
     env = dict(os.environ)
-    env["USERPROFILE"] = str(home)
-    env["HOME"] = str(home)
-    env["HOMEDRIVE"] = str(home)[:2]
-    env["HOMEPATH"] = str(home)[2:] or "\\"
-    return subprocess.run([PY, str(HOOKS / name)], input=json.dumps(stdin_obj),
+    env.update({"USERPROFILE": str(home), "HOME": str(home),
+                "HOMEDRIVE": str(home)[:2], "HOMEPATH": str(home)[2:] or "\\"})
+    return subprocess.run([PY, str(HOOKS / name)], input=json.dumps(obj),
                           text=True, capture_output=True, env=env)
 
 
-def setup_home():
-    home = Path(tempfile.mkdtemp())
-    d = home / ".claude" / "iesens"
-    d.mkdir(parents=True)
-    cfg = {"enabled": True, "detectors": {"skill": {"enabled": True, "min_repeats": 3}},
-           "adopted": [], "declined": [], "dismissed": []}
-    (d / "config.json").write_text(json.dumps(cfg))
+def setup():
+    home = Path(tempfile.mkdtemp()); d = home / ".claude" / "iesens"; d.mkdir(parents=True)
+    (d / "config.json").write_text(json.dumps(
+        {"enabled": True, "detectors": {"skill": {"enabled": True, "min_repeats": 3}},
+         "adopted": [], "declined": [], "dismissed": []}))
     return home, d
 
 
-def cfg_of(d):
-    return json.loads((d / "config.json").read_text(encoding="utf-8"))
+def cfg(d): return json.loads((d / "config.json").read_text(encoding="utf-8"))
+
+
+def intents(d):
+    p = d / "user_intents.jsonl"
+    return [json.loads(l)["sig"] for l in p.read_text(encoding="utf-8").splitlines()] if p.exists() else []
 
 
 def write_usage(d, events):
@@ -46,183 +47,141 @@ def write_usage(d, events):
             fh.write(json.dumps({"ts": round(now, 1), "tool": t, "shape": s}) + "\n")
 
 
-def check(name, cond, detail=""):
-    print(("PASS " if cond else "FAIL ") + name + ("" if cond else "  -- " + str(detail)))
-    if not cond:
-        FAILS.append(name)
+def write_intents(d, sigs):
+    now = time.time()
+    with open(d / "user_intents.jsonl", "w", encoding="utf-8") as fh:
+        for s in sigs:
+            fh.write(json.dumps({"ts": round(now, 1), "sig": s}) + "\n")
 
 
-def msg_of(p):
+def stop(home):
+    p = run("coach_pass.py", {}, home)
     try:
         return json.loads(p.stdout.strip()).get("systemMessage", "")
     except Exception:
         return ""
 
 
-def last_shape(d):
-    return json.loads((d / "usage.jsonl").read_text(encoding="utf-8").splitlines()[-1])["shape"]
+def ck(n, c, x=""):
+    print(("PASS " if c else "FAIL ") + n + ("" if c else "  :: " + str(x)))
+    if not c:
+        FAILS.append(n)
 
 
-def _pending(d, key=GITKEY, surface="skill", age=0):
+# --- learn: USER intent logging (privacy-safe, primary signal) ---
+def t_intent_logs_directive():
+    home, d = setup(); run("learn.py", {"prompt": "run the tests"}, home)
+    ck("intent_logs_directive", intents(d) == ["run tests"], intents(d)); shutil.rmtree(home, ignore_errors=True)
+
+
+def t_intent_bang_command():
+    home, d = setup(); run("learn.py", {"prompt": "!git push --tags"}, home)
+    ck("intent_bang_command", intents(d) == ["git push --tags"], intents(d)); shutil.rmtree(home, ignore_errors=True)
+
+
+def t_intent_skips_thin_answer():
+    home, d = setup(); run("learn.py", {"prompt": "yes"}, home)
+    ck("intent_skips_thin", intents(d) == [], intents(d)); shutil.rmtree(home, ignore_errors=True)
+
+
+# --- coach: USER intent nudge fires first ---
+def t_coach_user_intent_nudge():
+    home, d = setup(); write_intents(d, ["run tests"] * 3)
+    ck("coach_intent_fires", "you keep asking me to `run tests`" in stop(home)); shutil.rmtree(home, ignore_errors=True)
+
+
+# --- coach: command at a HIGHER bar, reframed as a help offer ---
+def t_coach_command_higher_bar():
+    home, d = setup(); write_usage(d, [("Bash", "git push --tags")] * 3)
+    ck("coach_cmd_below_bar_silent", stop(home) == "")  # 3 < command_min(4)
+    home2, d2 = setup(); write_usage(d2, [("Bash", "git push --tags")] * 4)
+    m = stop(home2)
+    ck("coach_cmd_at_bar_fires", "`git push --tags` keeps coming up" in m, m)
+    ck("coach_cmd_not_accusatory", "you keep running" not in m, m)
+    shutil.rmtree(home, ignore_errors=True); shutil.rmtree(home2, ignore_errors=True)
+
+
+# --- coach: USER intent takes priority over a command signal ---
+def t_coach_intent_priority():
+    home, d = setup(); write_intents(d, ["run tests"] * 3); write_usage(d, [("Bash", "git push --tags")] * 6)
+    ck("coach_intent_priority", "you keep asking me to `run tests`" in stop(home)); shutil.rmtree(home, ignore_errors=True)
+
+
+# --- coach: noise never nudges ---
+def t_coach_noise():
+    home, d = setup(); write_usage(d, [("Read", ".md")] * 12 + [("Bash", "cd")] * 12 + [("Bash", "python")] * 12 + [("Bash", "python -c")] * 12)
+    ck("coach_noise_silent", stop(home) == ""); shutil.rmtree(home, ignore_errors=True)
+
+
+# --- gate ---
+def t_gate_intent_declined():
+    home, d = setup(); write_intents(d, ["run tests"] * 3)
+    c = cfg(d); c["declined"] = ["user_intent::run tests"]; (d / "config.json").write_text(json.dumps(c))
+    ck("gate_intent_declined", stop(home) == ""); shutil.rmtree(home, ignore_errors=True)
+
+
+def t_gate_command_adopted():
+    home, d = setup(); write_usage(d, [("Bash", "git push --tags")] * 5)
+    c = cfg(d); c["adopted"] = ["repetition::Bash::git push --tags"]; (d / "config.json").write_text(json.dumps(c))
+    ck("gate_command_adopted", stop(home) == ""); shutil.rmtree(home, ignore_errors=True)
+
+
+def t_throttle():
+    home, d = setup(); write_intents(d, ["run tests"] * 3)
+    (d / "pending.json").write_text(json.dumps({"key": "x", "ts": round(time.time(), 1)}))
+    ck("throttle_one_outstanding", stop(home) == ""); shutil.rmtree(home, ignore_errors=True)
+
+
+# --- learn: yes/no/never/cooldown + yes-bridge ---
+def _pending(d, key="user_intent::run tests", surface="slash_command", shape="run tests", age=0):
     (d / "pending.json").write_text(json.dumps(
-        {"key": key, "surface": surface, "ts": round(time.time() - age, 1)}))
+        {"key": key, "surface": surface, "signature": {"shape": shape}, "ts": round(time.time() - age, 1)}))
 
 
-# --- watcher: explicit-but-safe command signature ---
-def t_watcher_cmd_sig_keeps_flags():
-    home, d = setup_home()
-    run_hook("watcher.py", {"tool_name": "Bash", "tool_input": {"command": "git push --tags"}}, home)
-    check("watcher_cmd_sig_keeps_flags", last_shape(d) == "git push --tags", last_shape(d))
+def t_yes_adopts_and_emits():
+    home, d = setup(); _pending(d)
+    p = run("learn.py", {"prompt": "yes"}, home)
+    ck("yes_adopts", "user_intent::run tests" in cfg(d)["adopted"])
+    ck("yes_emits_expand", "hookSpecificOutput" in p.stdout and "run tests" in p.stdout, p.stdout[:160])
     shutil.rmtree(home, ignore_errors=True)
 
 
-def t_watcher_cmd_sig_drops_secrets():
-    home, d = setup_home()
-    run_hook("watcher.py", {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "my secret release note"'}}, home)
-    check("watcher_cmd_sig_drops_secret_msg", last_shape(d) == "git commit -m", last_shape(d))
+def t_no_declines():
+    home, d = setup(); _pending(d); run("learn.py", {"prompt": "no"}, home)
+    ck("no_declines", "user_intent::run tests" in cfg(d)["declined"]); shutil.rmtree(home, ignore_errors=True)
+
+
+def t_never_dismisses():
+    home, d = setup(); _pending(d); run("learn.py", {"prompt": "never"}, home)
+    ck("never_dismisses", "user_intent::run tests" in cfg(d)["dismissed"]); shutil.rmtree(home, ignore_errors=True)
+
+
+def t_movedon_cooldown():
+    home, d = setup(); _pending(d); run("learn.py", {"prompt": "look at the failing build instead"}, home)
+    c = cfg(d)
+    ck("movedon_cooldown", "user_intent::run tests" in (c.get("cooldown") or {}) and "user_intent::run tests" not in c.get("declined", []), c)
     shutil.rmtree(home, ignore_errors=True)
 
 
-def t_watcher_cmd_sig_stops_at_path():
-    home, d = setup_home()
-    run_hook("watcher.py", {"tool_name": "Bash", "tool_input": {"command": "cat /etc/secrets/key.pem"}}, home)
-    check("watcher_cmd_sig_stops_at_path", last_shape(d) == "cat", last_shape(d))
+def t_stale_pending():
+    home, d = setup(); _pending(d, age=2000); run("learn.py", {"prompt": "yes"}, home)
+    ck("stale_discarded", "user_intent::run tests" not in cfg(d)["adopted"] and not (d / "pending.json").exists())
     shutil.rmtree(home, ignore_errors=True)
 
 
-# --- watcher: adoption to its own file (M1 fix) ---
-def t_watcher_adopts_to_own_file():
-    home, d = setup_home()
-    run_hook("watcher.py", {"tool_name": "Write", "tool_input": {
-        "file_path": str(home / ".claude" / "skills" / "foo" / "SKILL.md")}}, home)
+def t_watcher_adoption():
+    home, d = setup()
+    run("watcher.py", {"tool_name": "Write", "tool_input": {"file_path": str(home / ".claude" / "skills" / "x" / "SKILL.md")}}, home)
     surf = json.loads((d / "adopted_surfaces.json").read_text())["surfaces"] if (d / "adopted_surfaces.json").exists() else []
-    check("watcher_adopts_to_own_file", "skill" in surf, surf)
-    check("watcher_does_not_touch_config_adopted", cfg_of(d)["adopted"] == [], cfg_of(d)["adopted"])
-    shutil.rmtree(home, ignore_errors=True)
-
-
-# --- coach_pass: fires on a real repeated command and NAMES it explicitly ---
-def t_coach_names_actual_command():
-    home, d = setup_home()
-    write_usage(d, [("Bash", "git push --tags")] * 4)
-    p = run_hook("coach_pass.py", {}, home)
-    m = msg_of(p)
-    check("coach_fires_pending", (d / "pending.json").exists())
-    check("coach_names_actual_command", "`git push --tags`" in m, m)
-    check("coach_says_benefit", "saved command" in m, m)
-    check("coach_msg_invite", "Would you like to know more?" in m, m)
-    shutil.rmtree(home, ignore_errors=True)
-
-
-def t_coach_ignores_noise():
-    home, d = setup_home()
-    write_usage(d, [("Read", ".md")] * 12 + [("Grep", "search")] * 12 + [("Bash", "cd")] * 12)
-    p = run_hook("coach_pass.py", {}, home)
-    check("coach_ignores_noise", p.stdout.strip() == "" and not (d / "pending.json").exists(), repr(p.stdout))
-    shutil.rmtree(home, ignore_errors=True)
-
-
-def t_coach_gate_key_adopted_silent():
-    home, d = setup_home()
-    write_usage(d, [("Bash", "git push --tags")] * 4)
-    c = cfg_of(d); c["adopted"] = [GITKEY]; (d / "config.json").write_text(json.dumps(c))
-    p = run_hook("coach_pass.py", {}, home)
-    check("coach_gate_key_adopted_silent", p.stdout.strip() == "", repr(p.stdout))
-    shutil.rmtree(home, ignore_errors=True)
-
-
-def t_coach_surface_adopt_does_not_blanket():
-    home, d = setup_home()
-    write_usage(d, [("Bash", "git push --tags")] * 4)
-    c = cfg_of(d); c["adopted"] = ["skill"]; (d / "config.json").write_text(json.dumps(c))
-    p = run_hook("coach_pass.py", {}, home)
-    check("coach_surface_adopt_no_blanket", "[iesens] noticed" in msg_of(p), repr(p.stdout))
-    shutil.rmtree(home, ignore_errors=True)
-
-
-def t_coach_gate_declined():
-    home, d = setup_home()
-    write_usage(d, [("Bash", "git push --tags")] * 4)
-    c = cfg_of(d); c["declined"] = [GITKEY]; (d / "config.json").write_text(json.dumps(c))
-    p = run_hook("coach_pass.py", {}, home)
-    check("coach_gate_declined_silent", p.stdout.strip() == "", repr(p.stdout))
-    shutil.rmtree(home, ignore_errors=True)
-
-
-# --- learn.py: exact yes/no/never; stale/multiword/empty handled safely ---
-def t_learn_no_declines():
-    home, d = setup_home(); _pending(d)
-    run_hook("learn.py", {"prompt": "no"}, home)
-    check("learn_no_declines", GITKEY in cfg_of(d)["declined"] and not (d / "pending.json").exists(), cfg_of(d))
-    shutil.rmtree(home, ignore_errors=True)
-
-
-def t_learn_never_dismisses():
-    home, d = setup_home(); _pending(d)
-    run_hook("learn.py", {"prompt": "never"}, home)
-    check("learn_never_dismisses", GITKEY in cfg_of(d)["dismissed"], cfg_of(d))
-    shutil.rmtree(home, ignore_errors=True)
-
-
-def t_learn_yes_adopts_key():
-    home, d = setup_home(); _pending(d)
-    run_hook("learn.py", {"prompt": "yes"}, home)
-    check("learn_yes_adopts_key", GITKEY in cfg_of(d)["adopted"], cfg_of(d))
-    shutil.rmtree(home, ignore_errors=True)
-
-
-def t_learn_multiword_not_captured():
-    home, d = setup_home(); _pending(d)
-    run_hook("learn.py", {"prompt": "yes go commit that file for me now"}, home)
-    c = cfg_of(d)
-    check("learn_multiword_not_false_yes", GITKEY not in c.get("adopted", []) and GITKEY in (c.get("cooldown") or {}), c)
-    shutil.rmtree(home, ignore_errors=True)
-
-
-def t_learn_stale_pending_discarded():
-    home, d = setup_home(); _pending(d, age=2000)
-    run_hook("learn.py", {"prompt": "yes"}, home)
-    c = cfg_of(d)
-    ok = GITKEY not in c.get("adopted", []) and c.get("declined", []) == [] and not (d / "pending.json").exists()
-    check("learn_stale_pending_discarded", ok, c)
-    shutil.rmtree(home, ignore_errors=True)
-
-
-def t_learn_movedon_cooldown_not_declined():
-    home, d = setup_home(); _pending(d)
-    run_hook("learn.py", {"prompt": "actually fix the failing build in src/api first"}, home)
-    c = cfg_of(d)
-    ok = GITKEY in (c.get("cooldown") or {}) and GITKEY not in c.get("declined", []) and not (d / "pending.json").exists()
-    check("learn_movedon_soft_cooldown", ok, c)
-    shutil.rmtree(home, ignore_errors=True)
-
-
-def t_learn_empty_prompt_failsafe():
-    home, d = setup_home(); _pending(d)
-    run_hook("learn.py", {"prompt": ""}, home)
-    c = cfg_of(d)
-    ok = c["declined"] == [] and c["dismissed"] == [] and c["adopted"] == [] and (d / "pending.json").exists()
-    check("learn_empty_prompt_failsafe", ok, c)
-    shutil.rmtree(home, ignore_errors=True)
-
-
-def t_learn_noop_without_pending():
-    home, d = setup_home()
-    run_hook("learn.py", {"prompt": "no"}, home)
-    c = cfg_of(d)
-    check("learn_noop_without_pending", c["declined"] == [] and c["dismissed"] == [], c)
-    shutil.rmtree(home, ignore_errors=True)
+    ck("watcher_adoption", "skill" in surf, surf); shutil.rmtree(home, ignore_errors=True)
 
 
 if __name__ == "__main__":
-    for fn in [t_watcher_cmd_sig_keeps_flags, t_watcher_cmd_sig_drops_secrets,
-               t_watcher_cmd_sig_stops_at_path, t_watcher_adopts_to_own_file,
-               t_coach_names_actual_command, t_coach_ignores_noise,
-               t_coach_gate_key_adopted_silent, t_coach_surface_adopt_does_not_blanket,
-               t_coach_gate_declined, t_learn_no_declines, t_learn_never_dismisses,
-               t_learn_yes_adopts_key, t_learn_multiword_not_captured,
-               t_learn_stale_pending_discarded, t_learn_movedon_cooldown_not_declined,
-               t_learn_empty_prompt_failsafe, t_learn_noop_without_pending]:
+    for fn in [t_intent_logs_directive, t_intent_bang_command, t_intent_skips_thin_answer,
+               t_coach_user_intent_nudge, t_coach_command_higher_bar, t_coach_intent_priority,
+               t_coach_noise, t_gate_intent_declined, t_gate_command_adopted, t_throttle,
+               t_yes_adopts_and_emits, t_no_declines, t_never_dismisses, t_movedon_cooldown,
+               t_stale_pending, t_watcher_adoption]:
         try:
             fn()
         except Exception as e:

@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Deterministic multi-turn SIMULATION of a real developer session through the
-ACTUAL iesens hooks (watcher / coach_pass / learn) against a throwaway HOME.
-Exercises the full learning arc and asserts behavior at each turn:
-fire -> decline -> fire(other) -> adopt -> suppress(declined) -> suppress(adopted)
--> observe-adoption -> new-cmd-not-blanket-silenced -> moved-on cooldown -> suppress(cooldown).
-Run: python tests/sim_session.py
+"""Deterministic multi-turn SIMULATION through the real iesens hooks, USER-INPUT
+FIRST. The user's repeated REQUESTS drive the primary nudge; a genuinely repeated
+command in the work surfaces as a help offer at a higher bar; Claude's mechanical
+activity never nudges. Run: python tests/sim_session.py
 """
 import json, os, subprocess, sys, tempfile, shutil
 from pathlib import Path
@@ -23,21 +21,19 @@ D = home / ".claude" / "iesens"; D.mkdir(parents=True)
     {"enabled": True, "detectors": {"skill": {"enabled": True, "min_repeats": 3}},
      "adopted": [], "declined": [], "dismissed": []}))
 ENV = dict(os.environ)
-ENV.update({"USERPROFILE": str(home), "HOME": str(home),
-            "HOMEDRIVE": str(home)[:2], "HOMEPATH": str(home)[2:] or "\\"})
+ENV.update({"USERPROFILE": str(home), "HOME": str(home), "HOMEDRIVE": str(home)[:2], "HOMEPATH": str(home)[2:] or "\\"})
 
 
 def hook(name, obj):
-    return subprocess.run([PY, str(HOOKS / name)], input=json.dumps(obj),
-                          text=True, capture_output=True, env=ENV)
+    return subprocess.run([PY, str(HOOKS / name)], input=json.dumps(obj), text=True, capture_output=True, env=ENV)
 
 
-def bash(cmd):
-    hook("watcher.py", {"tool_name": "Bash", "tool_input": {"command": cmd}})
+def user(text):
+    return hook("learn.py", {"prompt": text})
 
 
-def writef(path):
-    hook("watcher.py", {"tool_name": "Write", "tool_input": {"file_path": path}})
+def cmd(c):
+    hook("watcher.py", {"tool_name": "Bash", "tool_input": {"command": c}})
 
 
 def stop():
@@ -46,10 +42,6 @@ def stop():
         return json.loads(p.stdout.strip()).get("systemMessage", "")
     except Exception:
         return ""
-
-
-def reply(text):
-    hook("learn.py", {"prompt": text})
 
 
 def cfg():
@@ -62,62 +54,40 @@ def ck(label, cond, extra=""):
         FAILS.append(label)
 
 
-print("TURN 1 — dev runs `npm run build` 4x, then stops")
-for _ in range(4):
-    bash("npm run build")
+print("TURN A — user asks 'run the tests' 3 times, then Claude stops")
+for _ in range(3):
+    user("run the tests")
 m = stop(); print("   nudge:", m or "(none)")
-ck("t1_nudge_fires", "npm run build" in m)
-ck("t1_explicit_command", "`npm run build`" in m)
-ck("t1_invite", "Would you like to know more?" in m)
+ck("A_user_intent_nudge", "you keep asking me to `run tests`" in m)
+ck("A_not_accusatory_about_claude", "you keep running" not in m)
 
-print("TURN 2 — dev replies 'no'")
-reply("no")
-ck("t2_npm_declined", "repetition::Bash::npm run build" in cfg().get("declined", []))
+print("TURN B — user says 'no'")
+user("no")
+ck("B_intent_declined", "user_intent::run tests" in cfg().get("declined", []))
 
-print("TURN 3 — dev runs `git push --tags` 4x, stops")
-for _ in range(4):
-    bash("git push --tags")
+print("TURN C — user asks 'run the tests' 3 more times -> SILENT (declined)")
+for _ in range(3):
+    user("run the tests")
 m = stop(); print("   nudge:", m or "(none)")
-ck("t3_fresh_nudge_on_git", "`git push --tags`" in m)
+ck("C_declined_silent", m == "")
 
-print("TURN 4 — dev replies 'yes'")
-reply("yes")
-ck("t4_git_adopted", "repetition::Bash::git push --tags" in cfg().get("adopted", []))
-
-print("TURN 5 — dev runs `npm run build` again -> must be SILENT (declined)")
+print("TURN D — Claude runs `docker compose up -d` 4x doing the work -> help-offer nudge (higher bar)")
 for _ in range(4):
-    bash("npm run build")
+    cmd("docker compose up -d")
 m = stop(); print("   nudge:", m or "(none)")
-ck("t5_declined_silent", m == "")
+ck("D_command_help_offer", "`docker compose up -d` keeps coming up" in m)
+ck("D_framed_as_help_not_accusation", "you keep running" not in m)
 
-print("TURN 6 — dev runs `git push --tags` again -> SILENT (adopted)")
+print("TURN E — user says 'yes' -> adopted + expand flow injected")
+p = user("yes")
+ck("E_command_adopted", "repetition::Bash::docker compose up -d" in cfg().get("adopted", []))
+ck("E_expand_context_injected", "hookSpecificOutput" in p.stdout and "docker compose up -d" in p.stdout)
+
+print("TURN F — Claude runs docker again 4x -> SILENT (adopted)")
 for _ in range(4):
-    bash("git push --tags")
+    cmd("docker compose up -d")
 m = stop(); print("   nudge:", m or "(none)")
-ck("t6_adopted_silent", m == "")
-
-print("TURN 7 — dev writes a skill file (adoption learned by behavior)")
-writef(str(home / ".claude" / "skills" / "deploy" / "SKILL.md"))
-surf = json.loads((D / "adopted_surfaces.json").read_text())["surfaces"] if (D / "adopted_surfaces.json").exists() else []
-ck("t7_skill_surface_learned", "skill" in surf, surf)
-
-print("TURN 8 — dev runs `docker compose up -d` 4x -> FRESH nudge (surface adoption did NOT blanket-silence)")
-for _ in range(4):
-    bash("docker compose up -d")
-m = stop(); print("   nudge:", m or "(none)")
-ck("t8_new_cmd_not_blanket_silenced", "`docker compose up -d`" in m)
-
-print("TURN 9 — dev moves on (long unrelated reply) -> cooldown, NOT declined")
-reply("actually can you refactor the auth module to use async tokens")
-c = cfg()
-ck("t9_docker_cooldown", "repetition::Bash::docker compose up -d" in (c.get("cooldown") or {}))
-ck("t9_docker_not_declined", "repetition::Bash::docker compose up -d" not in c.get("declined", []))
-
-print("TURN 10 — dev runs `docker compose up -d` again immediately -> SILENT (cooldown)")
-for _ in range(4):
-    bash("docker compose up -d")
-m = stop(); print("   nudge:", m or "(none)")
-ck("t10_cooldown_silent", m == "")
+ck("F_adopted_silent", m == "")
 
 print("\nFINAL ledgers:", json.dumps(cfg()))
 shutil.rmtree(home, ignore_errors=True)

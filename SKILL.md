@@ -144,6 +144,15 @@ Each detector maps a *behavior signal* → a *native surface* the user is
 underusing. This breadth (opportunity, not just error) is the point. Keep each
 small: {signal, lesson, how-others, executor}.
 
+**Whose behavior counts — the USER's, not yours.** The signal is what the *user*
+types or asks for, never the tool calls *you* (Claude) make on their behalf. If
+you ran a command many times while doing their task, that is YOUR work, not their
+habit — never say "you keep running X." A pattern in the work is worth surfacing
+ONLY when it's a genuine, repeatable time-saver, and then only as a help offer
+about the workflow ("`npm run build` keeps coming up — want it as one command?"),
+never as an accusation of repetition. When in doubt whether it actually saves the
+user time, stay quiet.
+
 Only the **repeated-shell-command → skill** detector currently fires *ambiently*
 via the deterministic hook; every other surface (memory, subagent, hook,
 slash_command, mcp, automatable_goal) is surfaced through the **in-session skill

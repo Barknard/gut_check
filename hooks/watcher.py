@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """iesens watcher — a PostToolUse hook. Two privacy-preserving jobs:
 
-1) Record an explicit-but-safe SIGNATURE of each shell command to usage.jsonl:
-   program + subcommands + flags only (e.g. 'git push --tags', 'npm run build').
-   It NEVER stores free-text arguments, commit messages, paths, secrets, or file
-   contents — the FIRST token is sanitized too (env-assignments like
-   `TOKEN=... cmd` are stripped, command substitutions are redacted, and a path
-   program is reduced to its basename), so a secret can't ride in as token 0.
-2) LEARN ADOPTION from behavior: when a tool call shows you actually USING a
-   native capability (writing a skill/subagent/slash-command, wiring a hook,
-   saving a memory file, adding an MCP server), record that surface to
-   adopted_surfaces.json so iesens won't teach what you already do.
+1) Record a privacy-safe SIGNATURE of each shell command to usage.jsonl: program
+   + subcommands + flags only (e.g. 'git push --tags') — never arguments, commit
+   messages, paths, secrets, or file contents (the first token is sanitized too).
+   This is the *speed-up* signal: a workflow that keeps coming up — whoever runs
+   it — may be worth saving as one command. The nudge is gated hard and only fired
+   if it's a real time-saver (see coach_pass), and framed as a help offer, never
+   "you keep running X".
+2) LEARN ADOPTION from behavior: a write to a skill/subagent/command/hook/memory/
+   MCP path records that surface to adopted_surfaces.json (suppress-only, safe).
 
 Must be fast and must NEVER fail a tool call — any error exits 0 silently.
 Wire via the update-config skill:  PostToolUse -> python hooks/watcher.py
@@ -19,22 +18,16 @@ import sys, os, json, time, re
 
 IESENS_DIR = os.path.join(os.path.expanduser("~"), ".claude", "iesens")
 USAGE_LOG = os.path.join(IESENS_DIR, "usage.jsonl")
-CONFIG = os.path.join(IESENS_DIR, "config.json")
 ADOPTED_SURFACES = os.path.join(IESENS_DIR, "adopted_surfaces.json")
-MAX_LINES = 2000  # keep the log bounded; oldest lines fall off
+MAX_LINES = 2000
 
-# Flags that take a free-text value (message, password, user) — keep the flag but
-# STOP before its value so secrets/messages never enter the log.
 VALUE_FLAGS = {"-m", "--message", "-c", "-am", "-F", "-p", "--password", "-u", "--user"}
-# Short-flag stems whose ATTACHED value must be dropped (-psecret -> -p, -mWIP -> -m).
 ATTACHED_VALUE_STEMS = ("-p", "-m", "-u", "-W")
 _ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 _FORBIDDEN = ("/", "\\", "=", "$", '"', "'", "*", "~", "`", "(")
 
 
 def _safe_prog(tok: str) -> str:
-    """Sanitize the FIRST token (the program). Redact env-assignments and command
-    substitutions; reduce a path to its basename; never emit a secret or path."""
     if _ASSIGN.match(tok) or "$" in tok or "`" in tok or "(" in tok:
         return "(redacted)"
     if any(c in tok for c in ("/", "\\", '"', "'", "*", "~")):
@@ -46,27 +39,23 @@ def _safe_prog(tok: str) -> str:
 
 
 def _cmd_sig(command: str) -> str:
-    """Explicit-but-safe command signature: program + subcommands + flags, e.g.
-    'git push --tags' or 'npm run build'. Drops leading env-assignments, stops at
-    the first path/value/expansion/quoted token, and never keeps a free-text
-    value — so arguments, messages, paths, and secrets are never captured."""
     toks = command.strip().split()
     while toks and _ASSIGN.match(toks[0]):
-        toks = toks[1:]  # drop leading VAR=val env assignments (and their values)
+        toks = toks[1:]
     if not toks:
         return "(redacted)"
     out = [_safe_prog(toks[0])]
     for t in toks[1:]:
         if any(ch in t for ch in _FORBIDDEN):
-            break  # path / value / expansion / quoted free text
+            break
         if t in VALUE_FLAGS:
             out.append(t)
-            break  # keep the flag, drop its free-text value
+            break
         if len(t) > 2 and t[:2] in ATTACHED_VALUE_STEMS and t[1] != "-":
-            out.append(t[:2])  # attached value (-psecret): keep stem, drop value
+            out.append(t[:2])
             break
         if t.startswith("-") or (t.replace("-", "").replace(":", "").isalnum() and len(t) <= 16):
-            out.append(t)  # a flag or short subcommand token
+            out.append(t)
         else:
             break
         if len(" ".join(out)) >= 40:
@@ -75,26 +64,15 @@ def _cmd_sig(command: str) -> str:
 
 
 def _shape(tool: str, tool_input: dict) -> str:
-    """Program+subcommands+flags for shells; file extension for file ops; 'search'
-    for find tools — never free-text values, paths, or contents."""
     try:
         if tool in ("Bash", "PowerShell"):
             return _cmd_sig(str(tool_input.get("command", "")))
-        if tool in ("Edit", "Write", "Read", "NotebookEdit"):
-            path = str(tool_input.get("file_path", ""))
-            return os.path.splitext(path)[1].lower() or "(noext)"
-        if tool in ("Grep", "Glob"):
-            return "search"
         return ""
     except Exception:
         return ""
 
 
 def _adopted_surface(tool: str, tool_input: dict):
-    """If this call shows the user USING a native capability, return its surface
-    name. By destination path only (no contents); the loose surfaces (hook,
-    memory) are gated on a Claude-specific path segment to avoid false positives
-    from unrelated settings.json / *.md edits in other projects."""
     try:
         if tool not in ("Write", "Edit", "NotebookEdit"):
             return None
@@ -119,10 +97,6 @@ def _adopted_surface(tool: str, tool_input: dict):
 
 
 def _record_adoption(surface: str) -> None:
-    """Record an observed-in-use surface to its OWN file (not config.json) so the
-    sole writer of config.json stays learn.py — avoiding a lost-update race with
-    the async learn hook. Read by the /iesens skill to avoid teaching a capability
-    already in use; NOT used to blanket-suppress per-command nudges."""
     try:
         data = {}
         if os.path.exists(ADOPTED_SURFACES):
@@ -148,18 +122,19 @@ def main() -> None:
         if not tool:
             return
         ti = data.get("tool_input", {}) or {}
-        rec = {"ts": round(time.time(), 1), "tool": tool, "shape": _shape(tool, ti)}
         os.makedirs(IESENS_DIR, exist_ok=True)
-        with open(USAGE_LOG, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps(rec) + "\n")
-        try:
-            with open(USAGE_LOG, "r", encoding="utf-8") as fh:
-                lines = fh.readlines()
-            if len(lines) > MAX_LINES:
-                with open(USAGE_LOG, "w", encoding="utf-8") as fh:
-                    fh.writelines(lines[-MAX_LINES:])
-        except Exception:
-            pass
+        shape = _shape(tool, ti)
+        if shape:  # only shells produce a shape; everything else is logged nowhere
+            with open(USAGE_LOG, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps({"ts": round(time.time(), 1), "tool": tool, "shape": shape}) + "\n")
+            try:
+                with open(USAGE_LOG, "r", encoding="utf-8") as fh:
+                    lines = fh.readlines()
+                if len(lines) > MAX_LINES:
+                    with open(USAGE_LOG, "w", encoding="utf-8") as fh:
+                        fh.writelines(lines[-MAX_LINES:])
+            except Exception:
+                pass
         surface = _adopted_surface(tool, ti)
         if surface:
             _record_adoption(surface)

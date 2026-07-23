@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Regression tests for the audit fixes:
-A1 first-token privacy, B1 yes->expand bridge, B2 signature-collapse guard,
-B3 PowerShell support, C1 inline-eval noise, C2 one-outstanding-nudge throttle.
-Each hook runs as a real subprocess against a throwaway HOME.
+"""Privacy + denoise regressions for iesens. Two signature paths must never store
+a secret, path, or free-text value:
+- watcher._cmd_sig (the work signal) — sanitizes even the FIRST command token.
+- learn._intent_sig (the user-input signal) — only logs short directives, never a
+  prompt containing a path / secret / long token.
+Plus the PowerShell + inline-eval + bare-program denoise filters.
 Run: python tests/test_audit_fixes.py
 """
 import json, os, subprocess, sys, tempfile, shutil, time
@@ -13,7 +15,7 @@ PY = sys.executable
 FAILS = []
 
 
-def run_hook(name, obj, home):
+def run(name, obj, home):
     env = dict(os.environ)
     env.update({"USERPROFILE": str(home), "HOME": str(home),
                 "HOMEDRIVE": str(home)[:2], "HOMEPATH": str(home)[2:] or "\\"})
@@ -29,19 +31,29 @@ def setup():
     return home, d
 
 
-def cfg(d): return json.loads((d / "config.json").read_text(encoding="utf-8"))
-def lastshape(d): return json.loads((d / "usage.jsonl").read_text(encoding="utf-8").splitlines()[-1])["shape"]
+def last_shape(d):
+    return json.loads((d / "usage.jsonl").read_text(encoding="utf-8").splitlines()[-1])["shape"]
 
 
-def usage(d, events):
+def all_shapes(d):
+    p = d / "usage.jsonl"
+    return [json.loads(l)["shape"] for l in p.read_text(encoding="utf-8").splitlines()] if p.exists() else []
+
+
+def intents(d):
+    p = d / "user_intents.jsonl"
+    return [json.loads(l)["sig"] for l in p.read_text(encoding="utf-8").splitlines()] if p.exists() else []
+
+
+def write_usage(d, events):
     now = time.time()
     with open(d / "usage.jsonl", "w", encoding="utf-8") as fh:
         for t, s in events:
             fh.write(json.dumps({"ts": round(now, 1), "tool": t, "shape": s}) + "\n")
 
 
-def stopmsg(home):
-    p = run_hook("coach_pass.py", {}, home)
+def stop(home):
+    p = run("coach_pass.py", {}, home)
     try:
         return json.loads(p.stdout.strip()).get("systemMessage", "")
     except Exception:
@@ -54,78 +66,51 @@ def ck(n, c, x=""):
         FAILS.append(n)
 
 
-# A1 — first command token sanitized; secrets/paths never stored
-def a1_first_token():
+# --- watcher command signature: first token sanitized; secrets/paths never stored ---
+def watcher_cmd_sig():
     home, d = setup()
-    run_hook("watcher.py", {"tool_name": "Bash", "tool_input": {"command": "TOKEN=sk-abc123 npm publish"}}, home)
-    ck("A1_env_assign_stripped", lastshape(d) == "npm publish", lastshape(d))
-    run_hook("watcher.py", {"tool_name": "Bash", "tool_input": {"command": "PASSWORD=hunter2 ./deploy.sh"}}, home)
-    ck("A1_path_basename_only", lastshape(d) == "deploy.sh", lastshape(d))
-    run_hook("watcher.py", {"tool_name": "Bash", "tool_input": {"command": "$(whoami)"}}, home)
-    ck("A1_cmdsubst_redacted", lastshape(d) == "(redacted)", lastshape(d))
-    shapes = [json.loads(l)["shape"] for l in (d / "usage.jsonl").read_text(encoding="utf-8").splitlines()]
-    ck("A1_no_secret_in_any_shape", all("=" not in s and "hunter2" not in s and "sk-abc123" not in s for s in shapes), shapes)
+    run("watcher.py", {"tool_name": "Bash", "tool_input": {"command": "TOKEN=sk-abc123 npm publish"}}, home)
+    ck("cmd_env_assign_stripped", last_shape(d) == "npm publish", last_shape(d))
+    run("watcher.py", {"tool_name": "Bash", "tool_input": {"command": "PASSWORD=hunter2 ./deploy.sh"}}, home)
+    ck("cmd_path_basename_only", last_shape(d) == "deploy.sh", last_shape(d))
+    run("watcher.py", {"tool_name": "Bash", "tool_input": {"command": "$(whoami)"}}, home)
+    ck("cmd_cmdsubst_redacted", last_shape(d) == "(redacted)", last_shape(d))
+    run("watcher.py", {"tool_name": "Bash", "tool_input": {"command": 'git commit -m "secret note"'}}, home)
+    ck("cmd_drops_secret_msg", last_shape(d) == "git commit -m", last_shape(d))
+    ck("cmd_no_secret_in_any_shape", all("=" not in s and "hunter2" not in s and "sk-abc123" not in s for s in all_shapes(d)), all_shapes(d))
     shutil.rmtree(home, ignore_errors=True)
 
 
-def a1_coach_skips_tainted():
-    home, d = setup(); usage(d, [("Bash", "PASSWORD=hunter2")] * 4)
-    ck("A1_coach_skips_tainted", stopmsg(home) == "")
-    shutil.rmtree(home, ignore_errors=True)
-
-
-# B2 — bare collapsed program does not nudge; a real sub-command does
-def b2_collapse():
-    home, d = setup(); usage(d, [("Bash", "python")] * 4)
-    ck("B2_bare_python_silent", stopmsg(home) == "")
-    home2, d2 = setup(); usage(d2, [("Bash", "npm run build")] * 4)
-    ck("B2_real_subcmd_fires", "`npm run build`" in stopmsg(home2))
-    shutil.rmtree(home, ignore_errors=True); shutil.rmtree(home2, ignore_errors=True)
-
-
-# B3 — PowerShell is supported; PS noise verbs are filtered
-def b3_powershell():
-    home, d = setup(); usage(d, [("PowerShell", "docker compose up -d")] * 4)
-    ck("B3_powershell_fires", "`docker compose up -d`" in stopmsg(home))
-    home2, d2 = setup(); usage(d2, [("PowerShell", "get-childitem")] * 4)
-    ck("B3_ps_trivial_silent", stopmsg(home2) == "")
-    shutil.rmtree(home, ignore_errors=True); shutil.rmtree(home2, ignore_errors=True)
-
-
-# C1 — inline-eval probes are not nudged
-def c1_inline_eval():
-    home, d = setup(); usage(d, [("Bash", "python -c")] * 5)
-    ck("C1_inline_eval_silent", stopmsg(home) == "")
-    shutil.rmtree(home, ignore_errors=True)
-
-
-# C2 — one outstanding nudge at a time
-def c2_throttle():
-    home, d = setup(); usage(d, [("Bash", "git push --tags")] * 4)
-    (d / "pending.json").write_text(json.dumps(
-        {"key": "repetition::Bash::npm run build", "surface": "skill", "ts": round(time.time(), 1)}))
-    ck("C2_throttle_one_outstanding", stopmsg(home) == "")
-    shutil.rmtree(home, ignore_errors=True)
-
-
-# B1 — 'yes' injects the expand-flow context AND records adoption
-def b1_yes_bridge():
+# --- intent signature: only short directives; never a path/secret/long prompt ---
+def intent_sig_privacy():
     home, d = setup()
-    (d / "pending.json").write_text(json.dumps(
-        {"key": "repetition::Bash::git push --tags", "surface": "skill",
-         "signature": {"shape": "git push --tags"}, "ts": round(time.time(), 1)}))
-    p = run_hook("learn.py", {"prompt": "yes"}, home)
-    out = p.stdout
-    ok = ("hookSpecificOutput" in out and "additionalContext" in out
-          and "git push --tags" in out and "repetition::Bash::git push --tags" in out)
-    ck("B1_yes_emits_expand_context", ok, out[:200])
-    ck("B1_yes_still_adopts", "repetition::Bash::git push --tags" in cfg(d)["adopted"])
+    run("learn.py", {"prompt": "run the tests"}, home)
+    ck("intent_logs_directive", intents(d) == ["run tests"], intents(d))
+    run("learn.py", {"prompt": "format src/api.ts with prettier"}, home)
+    ck("intent_skips_path", intents(d) == ["run tests"], intents(d))  # unchanged: path prompt not logged
+    run("learn.py", {"prompt": "deploy with key=sk-secret-123"}, home)
+    ck("intent_skips_secret", intents(d) == ["run tests"], intents(d))  # '=' token -> skipped
+    run("learn.py", {"prompt": "please go ahead and refactor the entire auth module to use async tokens now everywhere"}, home)
+    ck("intent_skips_long", intents(d) == ["run tests"], intents(d))  # >10 words -> skipped
     shutil.rmtree(home, ignore_errors=True)
+
+
+# --- denoise ---
+def denoise():
+    home, d = setup(); write_usage(d, [("Bash", "python")] * 5)
+    ck("bare_python_silent", stop(home) == "")
+    h2, d2 = setup(); write_usage(d2, [("Bash", "python -c")] * 5)
+    ck("inline_eval_silent", stop(h2) == "")
+    h3, d3 = setup(); write_usage(d3, [("PowerShell", "docker compose up -d")] * 4)
+    ck("powershell_fires", "`docker compose up -d` keeps coming up" in stop(h3))
+    h4, d4 = setup(); write_usage(d4, [("PowerShell", "get-childitem")] * 5)
+    ck("ps_trivial_silent", stop(h4) == "")
+    for h in (home, h2, h3, h4):
+        shutil.rmtree(h, ignore_errors=True)
 
 
 if __name__ == "__main__":
-    for fn in [a1_first_token, a1_coach_skips_tainted, b2_collapse, b3_powershell,
-               c1_inline_eval, c2_throttle, b1_yes_bridge]:
+    for fn in [watcher_cmd_sig, intent_sig_privacy, denoise]:
         try:
             fn()
         except Exception as e:
