@@ -111,20 +111,20 @@
 <dialog id="setDlg">
   <form method="dialog" class="dlg" id="setForm">
     <h2>Settings</h2>
-    <p class="hint">Entries are saved as a CSV file in a GitHub repo that Excel can open. Set it up once on each phone you use.</p>
+    <p class="hint">Entries are saved as a CSV file (Excel opens it) in a <b>private</b> GitHub repo. The app won't save to a public repo. Set this up once on each phone.</p>
     <fieldset>
       <legend>Save to GitHub</legend>
       <div class="two">
         <label>Owner<input id="sOwner" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-        <label>Repository<input id="sRepo" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+        <label>Private repo<input id="sRepo" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
       </div>
       <div class="two">
-        <label>Branch<input id="sBranch" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+        <label>Branch<input id="sBranch" placeholder="default" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
         <label>File<input id="sPath" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
       </div>
       <label>Access token <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">make one</a>
         <input id="sToken" type="password" autocomplete="off" placeholder="github_pat_…" spellcheck="false"></label>
-      <p class="hint">Use a fine-grained token limited to this one repository with <b>Contents: Read and write</b>. The token stays on this phone only.</p>
+      <p class="hint">Use a fine-grained token limited to just that private repository with <b>Contents: Read and write</b>. The token stays on this phone only.</p>
       <div class="dlg-row">
         <span id="setMsg" class="set-msg"></span><span class="grow"></span>
         <button type="button" class="ghost" id="setDisconnect">Disconnect</button>

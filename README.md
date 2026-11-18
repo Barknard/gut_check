@@ -14,8 +14,9 @@ No build step and no server. It's plain HTML, CSS and JS served by GitHub Pages.
 
 ## Where the data lives
 
-Each entry is written to **`data/gut-log.csv`** on a branch named **`data`** in a GitHub repo you choose.
-The app creates both the branch and the file the first time it saves. Excel, Numbers and Google Sheets all open the CSV directly.
+This repo only holds the **app**, and it can be public. The log is stored in a **separate private repo**
+(default name `gut-log-data`), in a file called `gut-log.csv`. Excel, Numbers and Google Sheets all open it directly.
+The app checks the data repo before every session and **refuses to save to a public repo**.
 
 | id | timestamp | date | time | weekday | event | bristol_type | bristol_description |
 |---|---|---|---|---|---|---|---|
@@ -26,25 +27,16 @@ The app creates both the branch and the file the first time it saves. Excel, Num
 - **Settings → Download Excel / Download CSV** exports everything.
   **Import file…** reads `.xlsx`, `.csv` or `.txt` files and skips duplicate rows.
 
-## Setup (about 5 minutes)
+## Setup
 
-1. **Publish the site.** Merge this branch into `main`. In the repo, open **Settings → Pages**, choose
-   **Deploy from a branch → `main` / root**, and wait a minute. The site will be at `https://<owner>.github.io/<repo>/`.
-   > GitHub Pages on a *private* repo needs a paid GitHub plan. The page itself contains no data,
-   > so you can also host it from a public repo and keep the data in a private one (step 3).
-2. **Make a token.** Go to <https://github.com/settings/personal-access-tokens/new> and create a **fine-grained** token:
-   - Repository access: **Only select repositories →** the repo that will hold the data
-   - Permissions: **Contents → Read and write**
-   - Expiration: whatever you're comfortable with. The app will show "Not saved" when the token expires.
-3. **On the phone:** open the site, tap ⚙️, and check that Owner and Repository point at the **data** repo
-   (these fill in automatically from the URL). Paste the token, then tap **Save & connect**. Anything already logged on the phone gets uploaded.
-4. **Add it to the home screen.** On iPhone, tap Safari's Share button, then **Add to Home Screen**. It then opens full screen like an app.
-
-The token is stored only in that phone's browser storage. It never gets committed.
-
-## Privacy
-
-Keep the repository that holds `data/gut-log.csv` **private**: it's health data. The page has a `noindex` meta tag.
+1. **Site:** in this repo, open **Settings → Pages → Deploy from a branch → `main` / root**.
+   The site is at `https://<owner>.github.io/<repo>/`.
+2. **Data repo:** create a new **private** repo named `gut-log-data` at <https://github.com/new>.
+   Ticking "Add a README" is fine; the app creates the CSV itself.
+3. **Token:** at <https://github.com/settings/personal-access-tokens/new>, create a **fine-grained** token with
+   repository access **Only select repositories → `gut-log-data`** and permission **Contents → Read and write**.
+4. **Phone:** open the site, tap ⚙️, check that Owner is right and Private repo says `gut-log-data`, paste the token,
+   and tap **Save & connect**. Then use **Share → Add to Home Screen**. The token is stored only on that phone.
 
 ## Files
 

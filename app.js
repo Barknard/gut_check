@@ -96,9 +96,8 @@ let cfg = Object.assign(defaultCfg(), load(K.cfg, {}));
 let ui = Object.assign({ tab: 'home', range: 14, hf: 'all' }, load(K.ui, {}));
 
 function defaultCfg() {
-  const h = location.hostname, seg = location.pathname.split('/').filter(Boolean)[0] || '';
-  const gh = h.endsWith('.github.io');
-  return { owner: gh ? h.split('.')[0] : '', repo: gh ? (seg || h) : '', branch: 'data', path: 'data/gut-log.csv', token: '' };
+  const h = location.hostname, gh = h.endsWith('.github.io');
+  return { owner: gh ? h.split('.')[0] : '', repo: 'gut-log-data', branch: '', path: 'gut-log.csv', token: '' };
 }
 const connected = () => !!(cfg.owner && cfg.repo && cfg.token && cfg.path);
 
@@ -193,27 +192,34 @@ const filePath = () => cfg.path.split('/').map(encodeURIComponent).join('/');
 
 class HttpError extends Error { constructor(r, msg) { super(msg || `GitHub said ${r.status}`); this.status = r.status; } }
 
-async function ensureBranch() {
-  const r = await api(`/branches/${encodeURIComponent(cfg.branch)}`);
+let activeBranch = '';
+const refQ = () => activeBranch ? `?ref=${encodeURIComponent(activeBranch)}` : '';
+// Checks the data repo is reachable and PRIVATE (health data must never land in a public repo),
+// then makes sure the chosen branch exists (blank branch = the repo's default branch).
+async function checkRepo() {
+  const repo = await api('');
+  if (!repo.ok) throw new HttpError(repo, repo.status === 404 ? 'Repo not found. Check the owner/name, and that the token can access it.' : repo.status === 401 ? 'Token rejected' : null);
+  const info = await repo.json();
+  if (!info.private) throw new HttpError({ status: 0 }, `${cfg.owner}/${cfg.repo} is public. Use a private repo for the log.`);
+  activeBranch = cfg.branch && cfg.branch !== info.default_branch ? cfg.branch : '';
+  if (!activeBranch) return;
+  const r = await api(`/branches/${encodeURIComponent(activeBranch)}`);
   if (r.ok) return;
   if (r.status !== 404) throw new HttpError(r);
-  const repo = await api('');
-  if (!repo.ok) throw new HttpError(repo, repo.status === 404 ? 'Repo not found (check owner/name and token access)' : null);
-  const def = (await repo.json()).default_branch;
-  const ref = await api(`/git/ref/heads/${encodeURIComponent(def)}`);
-  if (!ref.ok) throw new HttpError(ref);
+  const ref = await api(`/git/ref/heads/${encodeURIComponent(info.default_branch)}`);
+  if (!ref.ok) { activeBranch = ''; return; } // empty repo: write the first file to the default branch
   const sha = (await ref.json()).object.sha;
-  const mk = await api('/git/refs', { method: 'POST', body: JSON.stringify({ ref: `refs/heads/${cfg.branch}`, sha }) });
-  if (!mk.ok && mk.status !== 422) throw new HttpError(mk, 'Could not create the data branch');
+  const mk = await api('/git/refs', { method: 'POST', body: JSON.stringify({ ref: `refs/heads/${activeBranch}`, sha }) });
+  if (!mk.ok && mk.status !== 422) throw new HttpError(mk, 'Could not create the branch');
 }
 async function fetchRemote() {
-  const r = await api(`/contents/${filePath()}?ref=${encodeURIComponent(cfg.branch)}`);
+  const r = await api(`/contents/${filePath()}${refQ()}`);
   if (r.status === 404) return { sha: null, list: [] };
   if (!r.ok) throw new HttpError(r, r.status === 401 ? 'Token rejected' : null);
   const j = await r.json();
   let text = j.content ? b64dec(j.content) : '';
   if (!j.content && j.size > 0) {
-    const raw = await api(`/contents/${filePath()}?ref=${encodeURIComponent(cfg.branch)}`, { headers: { Accept: 'application/vnd.github.raw' } });
+    const raw = await api(`/contents/${filePath()}${refQ()}`, { headers: { Accept: 'application/vnd.github.raw' } });
     text = await raw.text();
   }
   return { sha: j.sha, list: rowsToEntries(parseDelimited(text)) };
@@ -232,13 +238,14 @@ async function sync() {
   if (syncing) { again = true; return; }
   syncing = true; setStatus('busy');
   try {
-    if (!branchOk) { await ensureBranch(); branchOk = true; }
+    if (!branchOk) { await checkRepo(); branchOk = true; }
     for (let attempt = 0; ; attempt++) {
       const { sha, list } = await fetchRemote();
       const ops = pending.slice();
       if (!ops.length) { snapshot = list; break; }
       const merged = applyOps(list, ops);
-      const body = { message: commitMsg(ops), content: b64enc(toCSV(merged)), branch: cfg.branch };
+      const body = { message: commitMsg(ops), content: b64enc(toCSV(merged)) };
+      if (activeBranch) body.branch = activeBranch;
       if (sha) body.sha = sha;
       const r = await api(`/contents/${filePath()}`, { method: 'PUT', body: JSON.stringify(body) });
       if (r.ok) { snapshot = merged; pending = pending.slice(ops.length); break; }
@@ -249,7 +256,7 @@ async function sync() {
     render();
   } catch (e) {
     lastErr = navigator.onLine === false ? 'Offline: will sync later' : (e.message || 'Sync failed');
-    if (e.status === 404) branchOk = false;
+    branchOk = false;
   } finally {
     syncing = false; setStatus();
     if (again) { again = false; scheduleSync(300); }
@@ -686,8 +693,8 @@ function init() {
   $('#syncBtn').onclick = () => connected() ? sync() : $('#settingsBtn').click();
   $('#setSave').onclick = async () => {
     const wasLocal = !connected();
-    cfg = { owner: $('#sOwner').value.trim(), repo: $('#sRepo').value.trim(), branch: $('#sBranch').value.trim() || 'data',
-      path: $('#sPath').value.trim().replace(/^\/+/, '') || 'data/gut-log.csv', token: $('#sToken').value.trim() };
+    cfg = { owner: $('#sOwner').value.trim(), repo: $('#sRepo').value.trim(), branch: $('#sBranch').value.trim(),
+      path: $('#sPath').value.trim().replace(/^\/+/, '') || 'gut-log.csv', token: $('#sToken').value.trim() };
     save(K.cfg, cfg); branchOk = false;
     if (!connected()) return msg('Fill in owner, repository and token.', 'err');
     // entries logged before connecting get uploaded too
