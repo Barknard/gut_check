@@ -131,10 +131,11 @@ for (const t in outbox) outbox[t] = outbox[t].map(fixOp);
 
 function defaultCfg() {
   const h = location.hostname, gh = h.endsWith('.github.io');
-  return { owner: gh ? h.split('.')[0] : '', repo: 'gut-check-data', branch: '', path: 'gut-check.csv', token: '', fileName: '' };
+  return { owner: gh ? h.split('.')[0] : '', repo: 'gut-check-data', branch: '', path: 'gut-check.csv', token: '', fileName: '', gsUrl: '', gsKey: '' };
 }
 const connected = () => !!(cfg.owner && cfg.repo && cfg.token && cfg.path);
-const targets = () => [cfg.fileName && 'file', connected() && 'github'].filter(Boolean);
+const gsConnected = () => !!(cfg.gsUrl && cfg.gsKey);
+const targets = () => [cfg.fileName && 'file', gsConnected() && 'gsheet', connected() && 'github'].filter(Boolean);
 
 function applyOps(list, ops) {
   const m = new Map(list.map(e => [e.id, { ...e }]));
@@ -305,7 +306,7 @@ async function readDeviceFile() {
 
 /* ---------- saving to every place ---------- */
 class PermError extends Error {}
-const PLACE = { file: () => cfg.fileName, github: () => 'GitHub' };
+const PLACE = { file: () => cfg.fileName, gsheet: () => 'Google Sheet', github: () => 'GitHub' };
 const IO = {
   file: {
     async read() {
@@ -318,6 +319,20 @@ const IO = {
       const data = isXlsx(fileHandle) ? await xlsxBlob(list) : new Blob([toCSV(list)], { type: 'text/csv' });
       const w = await fileHandle.createWritable(); await w.write(data); await w.close();
       return true;
+    },
+  },
+  // A Google Sheet with the Gut Check Apps Script (google-sheet/Code.gs) deployed as a web app.
+  // text/plain POSTs avoid a CORS preflight, which Apps Script can't answer.
+  gsheet: {
+    async read() {
+      const j = await gsCall(fetch(`${cfg.gsUrl}?key=${encodeURIComponent(cfg.gsKey)}&t=${Date.now()}`, { cache: 'no-store' }));
+      const rows = j.rows || [];
+      return { list: rowsToEntries(rows), ver: j.ver, empty: rows.length === 0 };
+    },
+    async write(list, ver) {
+      const j = await gsCall(fetch(cfg.gsUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ key: cfg.gsKey, ver, rows: [CSV_HEAD, ...toRows(list)] }) }));
+      return !j.conflict; // conflict: another phone saved first, so re-read and merge
     },
   },
   github: {
@@ -337,6 +352,22 @@ const IO = {
     },
   },
 };
+async function gsCall(req) {
+  let r;
+  try { r = await req; } catch { throw new Error(navigator.onLine === false ? 'No internet right now. It will save when the phone is back online.' : 'Could not reach the Google Sheet.'); }
+  if (!r.ok) throw new Error(`The Google Sheet didn't answer (${r.status}). Check the script is deployed as a Web app with access “Anyone”.`);
+  let j; try { j = await r.json(); } catch { throw new Error('The Google Sheet answered with a sign-in page. Re-deploy the script with “Who has access: Anyone”.'); }
+  if (!j.ok && !j.conflict) throw new Error(j.error || 'The Google Sheet refused the change.');
+  return j;
+}
+// "…#gsheet=<web app url>&key=<secret>": the link the Sheet's Gut Check menu gives out
+function parseConnLink(text) {
+  const u = String(text || '').match(/gsheet=([^&\s#]+)/), k = String(text || '').match(/[?&#]key=([0-9a-f]{32,})/i);
+  if (!u || !k) return null;
+  let url; try { url = decodeURIComponent(u[1]); } catch { return null; }
+  if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)) return null; // only ever send the log to Google Apps Script
+  return { url, key: k[1] };
+}
 const same = (a, b) => Math.floor(a.ts / 1000) === Math.floor(b.ts / 1000) && a.ev === b.ev && (a.b || null) === (b.b || null);
 const byTs = m => [...m.values()].sort((a, b) => a.ts - b.ts);
 
@@ -734,7 +765,7 @@ function renderTrends(list) {
 /* ---------- render all ---------- */
 function render() {
   const list = entries();
-  renderKpis(list); renderRecent(list); renderBanner();
+  renderKpis(list); renderRecent(list); renderBanner(); renderDyk(list);
   if (ui.tab === 'history') renderHistory(list);
   if (ui.tab === 'trends') renderTrends(list);
   setStatus();
@@ -765,9 +796,9 @@ function log(ev, b = null, ts = Date.now()) {
 let pickAgo = 0;
 function openPicker() {
   pickAgo = 0; $$('#when .chip').forEach(c => c.classList.toggle('is-on', c.dataset.ago === '0'));
-  $('#actions').hidden = true; $('#recent').hidden = true; $('#kpis').hidden = true; $('#picker').hidden = false; scrollTo(0, 0); buzz();
+  $('#actions').hidden = true; $('#recent').hidden = true; $('#kpis').hidden = true; $('#dyk').classList.add('picking'); $('#picker').hidden = false; scrollTo(0, 0); buzz();
 }
-function closePicker() { $('#actions').hidden = false; $('#recent').hidden = false; $('#kpis').hidden = false; $('#picker').hidden = true; }
+function closePicker() { $('#actions').hidden = false; $('#recent').hidden = false; $('#kpis').hidden = false; $('#dyk').classList.remove('picking'); $('#picker').hidden = true; }
 
 /* ---------- edit dialog ---------- */
 let editing = null;
@@ -833,6 +864,144 @@ document.addEventListener('click', e => {
 });
 addEventListener('scroll', () => tip.hidden = true, { passive: true });
 
+/* ---------- "Did you know?": the most statistically significant pattern in the whole log ----------
+ * Each candidate pattern gets a proper test (Welch t, Mann-Whitney U, Fisher exact, chi-square,
+ * regression slope). Because several patterns are checked, p-values are Bonferroni-adjusted
+ * before a pattern is called reliable. Shown once the log is at least a week old. */
+const ST = (() => {
+  const lnG = x => { const c = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+    let y = x, t = x + 5.5; t -= (x + .5) * Math.log(t); let ser = 1.000000000190015; for (const v of c) ser += v / ++y; return -t + Math.log(2.5066282746310005 * ser / x); };
+  const tiny = v => Math.abs(v) < 1e-30 ? 1e-30 : v;
+  function betacf(a, b, x) {
+    const qab = a + b, qap = a + 1, qam = a - 1; let c = 1, d = 1 / tiny(1 - qab * x / qap), h = d;
+    for (let m = 1; m <= 300; m++) {
+      const m2 = 2 * m; let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+      d = 1 / tiny(1 + aa * d); c = tiny(1 + aa / c); h *= d * c;
+      aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+      d = 1 / tiny(1 + aa * d); c = tiny(1 + aa / c); const del = d * c; h *= del;
+      if (Math.abs(del - 1) < 3e-12) break;
+    }
+    return h;
+  }
+  const ibeta = (x, a, b) => { if (x <= 0) return 0; if (x >= 1) return 1;
+    const bt = Math.exp(lnG(a + b) - lnG(a) - lnG(b) + a * Math.log(x) + b * Math.log(1 - x));
+    return x < (a + 1) / (a + b + 2) ? bt * betacf(a, b, x) / a : 1 - bt * betacf(b, a, 1 - x) / b; };
+  const tP = (t, df) => ibeta(df / (df + t * t), df / 2, .5); // two-sided
+  function gammq(a, x) { // upper regularized incomplete gamma
+    if (x <= 0) return 1;
+    if (x < a + 1) { let ap = a, sum = 1 / a, del = sum; for (let n = 0; n < 500; n++) { ap++; del *= x / ap; sum += del; if (Math.abs(del) < Math.abs(sum) * 3e-12) break; }
+      return 1 - sum * Math.exp(-x + a * Math.log(x) - lnG(a)); }
+    let b = x + 1 - a, c = 1 / 1e-30, d = 1 / b, h = d;
+    for (let i = 1; i < 500; i++) { const an = -i * (i - a); b += 2; d = 1 / tiny(an * d + b); c = tiny(b + an / c); const del = d * c; h *= del; if (Math.abs(del - 1) < 3e-12) break; }
+    return Math.exp(-x + a * Math.log(x) - lnG(a)) * h;
+  }
+  const zP = z => { const x = Math.abs(z) / Math.SQRT2, t = 1 / (1 + .5 * x); // 2-sided normal, via erfc
+    return t * Math.exp(-x * x - 1.26551223 + t * (1.00002368 + t * (.37409196 + t * (.09678418 + t * (-.18628806 + t * (.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-.82215223 + t * .17087277))))))))); };
+  const varOf = a => { const m = mean(a); return a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1); };
+  function welch(a, b) {
+    if (a.length < 3 || b.length < 3) return null;
+    const v1 = varOf(a) / a.length, v2 = varOf(b) / b.length, se = Math.sqrt(v1 + v2);
+    if (!se) return null;
+    const df = (v1 + v2) ** 2 / (v1 * v1 / (a.length - 1) + v2 * v2 / (b.length - 1));
+    return tP((mean(a) - mean(b)) / se, df);
+  }
+  function mannWhitney(a, b) {
+    const n1 = a.length, n2 = b.length, N = n1 + n2; if (n1 < 4 || n2 < 4) return null;
+    const all = [...a.map(v => [v, 0]), ...b.map(v => [v, 1])].sort((x, y) => x[0] - y[0]);
+    let R1 = 0, ties = 0;
+    for (let i = 0; i < N;) { let j = i; while (j + 1 < N && all[j + 1][0] === all[i][0]) j++;
+      const r = (i + j) / 2 + 1, t = j - i + 1; ties += t ** 3 - t; for (let k = i; k <= j; k++) if (!all[k][1]) R1 += r; i = j + 1; }
+    const U = R1 - n1 * (n1 + 1) / 2, mu = n1 * n2 / 2, sd = Math.sqrt(n1 * n2 / 12 * ((N + 1) - ties / (N * (N - 1))));
+    if (!sd) return null;
+    return zP((Math.abs(U - mu) - .5) / sd);
+  }
+  function fisher(a, b, c, d) { // 2x2 table [[a, b], [c, d]], two-sided
+    const lf = n => lnG(n + 1), r1 = a + b, r2 = c + d, c1 = a + c, n = r1 + r2;
+    const pr = x => Math.exp(lf(r1) + lf(r2) + lf(c1) + lf(n - c1) - lf(n) - lf(x) - lf(r1 - x) - lf(c1 - x) - lf(r2 - c1 + x));
+    const p0 = pr(a); let p = 0;
+    for (let x = Math.max(0, c1 - r2); x <= Math.min(r1, c1); x++) { const px = pr(x); if (px <= p0 * (1 + 1e-7)) p += px; }
+    return Math.min(1, p);
+  }
+  function slope(xs, ys) {
+    const n = xs.length; if (n < 6) return null;
+    const mx = mean(xs), my = mean(ys); let sxx = 0, sxy = 0;
+    for (let i = 0; i < n; i++) { sxx += (xs[i] - mx) ** 2; sxy += (xs[i] - mx) * (ys[i] - my); }
+    if (!sxx) return null;
+    const b = sxy / sxx, a = my - b * mx; let ss = 0; for (let i = 0; i < n; i++) ss += (ys[i] - a - b * xs[i]) ** 2;
+    const se = Math.sqrt(ss / (n - 2) / sxx); if (!se) return null;
+    return { b, a, p: tP(b / se, n - 2) };
+  }
+  const chiUniform = obs => { const n = obs.reduce((s, x) => s + x, 0), e = n / obs.length;
+    return gammq((obs.length - 1) / 2, obs.reduce((s, o) => s + (o - e) ** 2 / e, 0) / 2); };
+  return { tP, zP, gammq, welch, mannWhitney, fisher, slope, chiUniform };
+})();
+
+function didYouKnow(list) {
+  if (!list.length || Date.now() - list[0].ts < 7 * DAY) return null;
+  const first = startOfDay(list[0].ts), today = startOfDay(Date.now());
+  const days = []; // complete days only
+  for (let d = first; d < today; d = addDays(d, 1)) {
+    const inD = list.filter(e => e.ts >= d && e.ts < addDays(d, 1)), has = ev => inD.some(e => e.ev === ev);
+    days.push({ d, poops: inD.filter(e => e.ev === 'poop').length, imodium: has('imodium'), gasx: has('gasx'), vomit: has('vomit') });
+  }
+  const poops = list.filter(e => e.ev === 'poop'), typed = poops.filter(p => p.b);
+  const f1 = v => (Math.round(v * 10) / 10).toFixed(1), pct = (a, n) => Math.round(a / n * 100);
+  const facts = [];
+  for (const m of MEDS) {
+    const name = EV[m].label, doses = list.filter(e => e.ev === m);
+    if (doses.length >= 3) {
+      const after = p => doses.some(d => p.ts > d.ts && p.ts - d.ts <= 24 * HOUR);
+      const a = typed.filter(after).map(p => p.b), b = typed.filter(p => !after(p)).map(p => p.b), p = ST.mannWhitney(a, b);
+      if (p !== null && Math.abs(mean(a) - mean(b)) >= .3)
+        facts.push({ p, text: `Stools are ${mean(a) < mean(b) ? 'firmer' : 'looser'} in the 24 hours after ${name}: average type ${f1(mean(a))}, vs ${f1(mean(b))} at other times.` });
+      const on = days.filter(d => d[m]).map(d => d.poops), off = days.filter(d => !d[m]).map(d => d.poops), q = ST.welch(on, off);
+      if (q !== null && Math.abs(mean(on) - mean(off)) >= .3)
+        facts.push({ p: q, text: `On days she takes ${name}, she poops ${f1(mean(on))} times on average, vs ${f1(mean(off))} on days without it.` });
+      const vOn = days.filter(d => d[m] && d.vomit).length, nOn = days.filter(d => d[m]).length, vOff = days.filter(d => !d[m] && d.vomit).length, nOff = days.length - nOn;
+      if (vOn + vOff >= 2 && nOn >= 3 && nOff >= 3)
+        facts.push({ p: ST.fisher(vOn, nOn - vOn, vOff, nOff - vOff), text: `She vomited on ${pct(vOn, nOn)}% of days with ${name}, vs ${pct(vOff, nOff)}% of days without it.` });
+    }
+  }
+  const wake = poops.filter(p => new Date(p.ts).getHours() >= 6); // 6am–midnight, so sleep doesn't make every pattern look "significant"
+  if (wake.length >= 12) {
+    const bins = Array(6).fill(0); wake.forEach(p => bins[Math.floor((new Date(p.ts).getHours() - 6) / 3)]++);
+    const top = bins.indexOf(Math.max(...bins)), lab = h => new Date(2000, 0, 1, h).toLocaleTimeString([], { hour: 'numeric' });
+    facts.push({ p: ST.chiUniform(bins), text: `${pct(bins[top], wake.length)}% of her daytime poops happen between ${lab(6 + top * 3)} and ${lab(9 + top * 3)}, about ${f1(bins[top] / wake.length * 6)}× what you'd expect if they were spread evenly.` });
+  }
+  if (typed.length >= 8) {
+    const r = ST.slope(typed.map(p => (p.ts - first) / DAY), typed.map(p => p.b));
+    if (r && Math.abs(r.b * 7) >= .2) {
+      const span = (typed[typed.length - 1].ts - first) / DAY;
+      facts.push({ p: r.p, text: `Her stools have been getting ${r.b < 0 ? 'firmer' : 'looser'} over time: from about type ${f1(r.a)} at the start to about ${f1(r.a + r.b * span)} now.` });
+    }
+  }
+  if (days.length >= 7) {
+    const r = ST.slope(days.map((_, i) => i), days.map(d => d.poops));
+    if (r && Math.abs(r.b * 7) >= .2)
+      facts.push({ p: r.p, text: `She's been pooping ${r.b > 0 ? 'more' : 'less'} often over time: from about ${f1(Math.max(0, r.a))} a day at the start to about ${f1(Math.max(0, r.a + r.b * (days.length - 1)))} now.` });
+  }
+  if (!facts.length) return { facts: [], days: days.length, m: 0 };
+  const m = facts.length;
+  facts.forEach(f => f.adj = Math.min(1, f.p * m));
+  facts.sort((a, b) => a.p - b.p);
+  const solid = facts.filter(f => f.adj < .05);
+  return { facts: solid.length ? solid : [facts[0]], days: days.length, m };
+}
+let dykIdx = 0;
+function renderDyk(list) {
+  const el = $('#dyk'); if (!el) return;
+  const r = didYouKnow(list);
+  if (!r) { el.hidden = true; return; }
+  if (!r.facts.length) { el.innerHTML = `<div class="dyk-head">💡 Did you know?</div><p>No clear patterns yet in ${r.days} days of data. Keep logging and check back.</p>`; el.hidden = false; return; }
+  const f = r.facts[dykIdx % r.facts.length], adj = f.adj;
+  const conf = adj < .001 ? 'Very unlikely to be chance' : adj < .01 ? 'Unlikely to be chance' : adj < .05 ? 'Probably not chance' : 'Early sign, could still be chance';
+  const pv = adj < .001 ? '< 0.001' : adj.toFixed(3);
+  el.innerHTML = `<div class="dyk-head">💡 Did you know?${r.facts.length > 1 ? `<button type="button" class="dyk-next">Next (${dykIdx % r.facts.length + 1}/${r.facts.length})</button>` : ''}</div>
+    <p>${esc(f.text)}</p>
+    <p class="dyk-sub"><b class="${adj < .05 ? 'sig' : 'tent'}">${conf}</b> · p ${pv} after checking ${r.m} pattern${r.m === 1 ? '' : 's'} · ${r.days} days of data. A pattern, not proof of cause: worth mentioning to her doctor.</p>`;
+  el.hidden = false;
+}
+
 /* ---------- where it's saved: places list + home-screen warning ---------- */
 function placeLine(t) {
   const st = tstat[t] || {};
@@ -847,7 +1016,8 @@ function placesHTML() {
   let h = row('ok', 'Inside this app', `${local.length} entries · a backup is kept each day for 30 days`);
   h += cfg.fileName ? row(tstat.file?.err ? 'warn' : 'ok', `File: ${esc(cfg.fileName)}`, placeLine('file'))
                     : row('off', FS_OK ? 'A file on this phone' : 'Copies in Files', FS_OK ? 'Not set up' : (lc ? `Last copy saved ${ago(lc)}` : 'No copy saved yet'));
-  h += connected() ? row(tstat.github?.err ? 'warn' : 'ok', `GitHub: ${esc(cfg.repo)}`, placeLine('github')) : row('off', 'Online backup (GitHub)', 'Not set up');
+  h += gsConnected() ? row(tstat.gsheet?.err ? 'warn' : 'ok', 'Google Sheet (in Google Drive)', placeLine('gsheet')) : row('off', 'Online backup (Google Sheet)', 'Not set up');
+  if (connected()) h += row(tstat.github?.err ? 'warn' : 'ok', `GitHub: ${esc(cfg.repo)}`, placeLine('github'));
   const n = 1 + targets().length;
   return `<ul class="places">${h}</ul><p class="places-sum ${n > 1 ? 'good' : 'bad'}">${n > 2 ? `✓ Saved in ${n} places. Very safe.` : n > 1 ? '✓ Saved in 2 places.' : '⚠ Only saved inside this app. Add a backup so the log can never be lost.'}</p>`;
 }
@@ -929,6 +1099,7 @@ function init() {
     if (s === 'err') { refreshPlaces(); $('#setDlg').showModal(); }
     sync();
   };
+  $('#dyk').onclick = e => { if (e.target.closest('.dyk-next')) { dykIdx++; renderDyk(entries()); } };
   $('#banner').onclick = e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.b === 'allow') allowFile();
@@ -940,7 +1111,7 @@ function init() {
   $('#resetOpen').onclick = () => {
     const all = entries(); if (!all.length) return note('There is nothing to delete.');
     const n = ev => all.filter(e => e.ev === ev).length;
-    const places = ['this phone', ...targets().map(t => t === 'file' ? `<b>${esc(cfg.fileName)}</b>` : `<b>${esc(cfg.repo)}</b> on GitHub`)];
+    const places = ['this phone', ...targets().map(t => t === 'file' ? `<b>${esc(cfg.fileName)}</b>` : t === 'gsheet' ? 'the <b>Google Sheet</b>' : `<b>${esc(cfg.repo)}</b> on GitHub`)];
     $('#resetText').innerHTML = `This deletes all <b>${all.length}</b> entries (${n('poop')} poop, ${n('vomit')} vomit, ${n('imodium')} Imodium, ${n('gasx')} Gas-X) from ${places.join(' and ')}. Settings are kept.`;
     $('#resetDlg').showModal();
   };
@@ -976,10 +1147,10 @@ function init() {
     $('#wzNext').textContent = n === 0 ? 'Start' : n === WZ - 1 ? 'Done' : 'Next';
     $('#wzDots').innerHTML = Array.from({ length: WZ }, (_, i) => `<i class="${i === n ? 'on' : ''}"></i>`).join('');
     if (n === 3) renderBackups();
-    refreshPlaces(); fillDev(); fillGh();
+    refreshPlaces(); fillDev(); fillGh(); fillGs();
     $('#wizDlg .dlg').scrollTop = 0;
   }
-  function openWizard(n) { $('#setDlg').open && $('#setDlg').close(); msg(''); dmsg(''); $('#wzImpMsg').textContent = ''; showStep(n); $('#wizDlg').showModal(); }
+  function openWizard(n) { $('#setDlg').open && $('#setDlg').close(); msg(''); dmsg(''); gsmsg(''); $('#wzImpMsg').textContent = ''; showStep(n); $('#wizDlg').showModal(); }
   $('#wzNext').onclick = () => wzStep === WZ - 1 ? $('#wizDlg').close() : showStep(wzStep + 1);
   $('#wzBack').onclick = () => showStep(wzStep - 1);
   $('#wzClose').onclick = () => $('#wizDlg').close();
@@ -1054,6 +1225,42 @@ function init() {
     fillGh(); refreshPlaces(); setStatus(); renderBanner(); msg('Disconnected. Nothing was deleted on GitHub, and every entry is still in the app.');
   };
 
+  // step 2: Google Sheet
+  const gsmsg = (t, c = '') => { const m = $('#gsMsg'); m.textContent = t; m.className = 'set-msg ' + c; };
+  let gsCode = '';
+  const appUrl = () => location.origin + location.pathname.replace(/[^/]*$/, '');
+  const loadGsCode = () => gsCode ? null : fetch('google-sheet/Code.gs', { cache: 'no-store' }).then(r => r.text())
+    .then(t => { gsCode = t.replace(/const APP_URL = '[^']*';/, `const APP_URL = '${appUrl()}';`); }).catch(() => {});
+  function fillGs() {
+    $('#gsState').innerHTML = gsConnected() ? '✓ Saving to the Google Sheet.' : '';
+    $('#gsDisconnect').hidden = !gsConnected();
+    loadGsCode();
+  }
+  $('#gsCopy').onclick = async () => { // the code is fetched ahead of time so the copy happens inside this tap (Safari needs that)
+    try { if (!gsCode) await loadGsCode(); await navigator.clipboard.writeText(gsCode); gsmsg('Script copied. Paste it into Apps Script.', 'ok'); }
+    catch { gsmsg("Couldn't copy automatically. Use “view it” and copy all the text by hand.", 'err'); }
+  };
+  async function connectSheet(link) {
+    const c = parseConnLink(link);
+    if (!c) return gsmsg('That doesn\'t look like a Gut Check connection link. In the Sheet use Gut Check → Get connection link, and copy the whole link.', 'err');
+    cfg.gsUrl = c.url; cfg.gsKey = c.key; save(K.cfg, cfg);
+    outbox.gsheet = []; tstat.gsheet = {}; save(K.out, outbox);
+    gsmsg('Connecting…'); await sync(); fillGs();
+    if (tstat.gsheet?.err) gsmsg(tstat.gsheet.err, 'err');
+    else { gsmsg(`Connected. All ${local.length} entries are in the Google Sheet, and every new tap is too.`, 'ok'); $('#gsLink').value = ''; }
+  }
+  $('#gsConnect').onclick = () => connectSheet($('#gsLink').value);
+  $('#gsDisconnect').onclick = () => {
+    cfg.gsUrl = ''; cfg.gsKey = ''; save(K.cfg, cfg); delete outbox.gsheet; delete tstat.gsheet; save(K.out, outbox); save(K.tstat, tstat);
+    fillGs(); refreshPlaces(); setStatus(); renderBanner(); gsmsg('Disconnected. Nothing in the Sheet was deleted, and every entry is still in the app.');
+  };
+  // opening the connection link itself (e.g. tapped in an email) connects too, after asking
+  function connectFromHash() {
+    if (!/gsheet=/.test(location.hash)) return;
+    const link = location.hash; history.replaceState(null, '', location.pathname + location.search);
+    if (confirm('Connect Gut Check to your Google Sheet? Every entry will be saved there too.')) { openWizard(2); connectSheet(link); }
+  }
+
   // step 3: bring in data
   $('#wzImp').onchange = onImport((t, c) => { const m = $('#wzImpMsg'); m.textContent = t; m.className = 'set-msg ' + c; renderBackups(); });
   async function renderBackups() {
@@ -1088,7 +1295,7 @@ function init() {
     } else if (cfg.fileName) {
       tstat.file = { ...(tstat.file || {}), err: 'The link to the file was lost. Link it again in Settings → Set up saving & backups.', errAt: tstat.file?.errAt || Date.now() };
     }
-    render(); scheduleSync(50); scheduleBackup();
+    render(); scheduleSync(50); scheduleBackup(); connectFromHash();
   });
 }
 init();

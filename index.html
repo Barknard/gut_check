@@ -64,6 +64,7 @@
       </div>
 
       <div class="recent" id="recent"></div>
+      <div class="dyk" id="dyk" hidden></div>
     </section>
 
     <!-- HISTORY -->
@@ -185,8 +186,28 @@
 
     <section class="wz-step" id="wzGh" hidden>
       <p class="wz-kicker">Step 2 of 3 · Recommended</p>
-      <h2>Back up online (free)</h2>
-      <p>Saves to a <b>private</b> storage space on GitHub that only you can see. It saves automatically, keeps every past version, and lets another phone use the same log.</p>
+      <h2>Back up online to Google Drive (free)</h2>
+      <p>Every entry is saved into a <b>Google Sheet</b> in your own Google Drive. It saves automatically, keeps past versions, and works on any phone. Only you can see it.</p>
+      <p class="set-line" id="gsState"></p>
+      <p class="wz-note">💻 Steps 1–5 are easiest <b>on a computer</b>, signed in to your Google account. The phone only needs the link at the end.</p>
+      <ol class="wz-list">
+        <li><a href="https://sheets.new" target="_blank" rel="noopener">Create a new Google Sheet</a> and name it <b>Gut Check log</b>.</li>
+        <li>In the Sheet, open <b>Extensions → Apps Script</b>. Delete the code that's there, then paste the Gut Check script:
+          <span class="dlg-row wrap" style="margin-top:6px"><button type="button" class="ghost" id="gsCopy">Copy the script</button><a href="google-sheet/Code.gs" target="_blank" rel="noopener">view it</a></span>
+          Press <b>Save</b> (the disk icon).</li>
+        <li>Press <b>Deploy → New deployment</b>. Click the gear ⚙ next to "Select type" and choose <b>Web app</b>. Set <b>Execute as: Me</b> and <b>Who has access: Anyone</b>, then press <b>Deploy</b>.</li>
+        <li>Press <b>Authorize access</b> and choose your Google account. Google will say <i>"Google hasn't verified this app"</i>. That's expected, because the script is yours and not from an app store. Press <b>Advanced → Go to … (unsafe)</b>, then <b>Allow</b>.</li>
+        <li>Go back to the Sheet and <b>reload the page</b>. A new <b>Gut Check</b> menu appears. Choose <b>Get connection link</b>, then <b>Copy link</b> (or <b>Email it to myself</b>).</li>
+        <li>On this phone, paste the link below and press <b>Connect</b>. The link is also kept in the Sheet's <b>Connect</b> tab, which the Google Sheets app can open.</li>
+      </ol>
+      <label>Connection link<textarea id="gsLink" rows="3" placeholder="https://…#gsheet=…&amp;key=…" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea></label>
+      <div class="dlg-row">
+        <button type="button" class="ghost" id="gsDisconnect">Disconnect</button><span class="grow"></span>
+        <button type="button" class="primary" id="gsConnect">Connect</button>
+      </div>
+      <span id="gsMsg" class="set-msg"></span>
+
+      <details class="adv gh-alt"><summary>Or use GitHub instead (for technical users)</summary>
       <p class="set-line" id="ghState"></p>
       <ol class="wz-list">
         <li>Sign in to GitHub, or make a free account. <a href="https://github.com/signup" target="_blank" rel="noopener">Open GitHub</a></li>
@@ -214,6 +235,7 @@
         <button type="button" class="primary" id="setSave">Connect</button>
       </div>
       <span id="setMsg" class="set-msg"></span>
+      </details>
     </section>
 
     <section class="wz-step" hidden>

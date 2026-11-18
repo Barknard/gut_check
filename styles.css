@@ -239,3 +239,17 @@ dialog.wiz .dlg { height: 100%; overflow-y: auto; display: flex; flex-direction:
 .bk { display: flex; align-items: center; gap: 10px; justify-content: space-between; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 8px 8px 8px 12px; }
 .bk small { display: block; color: var(--text-2); font-size: 12px; }
 .bk button { padding: 8px 12px; }
+.dlg textarea { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px; font-size: 14px; width: 100%; resize: vertical; color: var(--text); font-family: ui-monospace, Menlo, monospace; }
+.wz-note { background: var(--surface-2); border-radius: 10px; padding: 8px 10px; font-size: 13.5px !important; }
+.gh-alt { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 6px; }
+.gh-alt > summary { font-size: 14px; font-weight: 600; color: var(--text-2); }
+.gh-alt[open] { display: grid; gap: 10px; }
+
+/* Did you know? */
+.dyk { margin-top: 16px; background: linear-gradient(180deg, #1d2430, var(--surface)); border: 1px solid #2c3a52; border-radius: 16px; padding: 12px 14px; }
+.dyk.picking { display: none; }
+.dyk-head { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 13px; color: #9ec5f4; text-transform: uppercase; letter-spacing: .04em; }
+.dyk p { margin: 6px 0 0; font-size: 15px; line-height: 1.45; }
+.dyk .dyk-sub { font-size: 12px; color: var(--text-2); }
+.dyk-sub .sig { color: #5fd35f; } .dyk-sub .tent { color: #fab219; }
+.dyk-next { background: none; border: 1px solid #2c3a52; color: #9ec5f4; border-radius: 999px; padding: 3px 10px; font-size: 12px; text-transform: none; letter-spacing: 0; }
