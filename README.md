@@ -23,7 +23,7 @@ Everything can be saved in several places at once. The badge at the top of the a
 
 1. **Inside the app on the phone.** Always on. The app also keeps an **automatic backup for each of the last 30 days**, plus one taken just before "Delete all". Any of them can be restored.
 2. **A spreadsheet file on the phone** (`.xlsx` or `.csv`). Android (Chrome) and computers (Chrome or Edge) only. Picking a Google Drive folder also gets the file off the phone. iPhones can't do this, so they get a **Save a copy to Files** button instead.
-3. **A Google Sheet in her Google Drive** (recommended, free, works on every phone). A small script in the Sheet ([`google-sheet/Code.gs`](google-sheet/Code.gs)) receives the entries. Google Sheets also keeps its own version history.
+3. **A Google Sheet in her Google Drive** (recommended, free, works on every phone). A small Apps Script ([`google-sheet/Code.gs`](google-sheet/Code.gs)) creates the Sheet and receives the entries. Google Sheets also keeps its own version history.
 4. **A private GitHub repository** (for technical users). Keeps every past version. The app refuses to save to a public repository.
 
 How the copies stay in step:
@@ -46,15 +46,16 @@ The **first time** someone opens the app, a setup wizard pops up by itself. On l
 
 The wizard is a picture-led journey: a row of step icons at the top, a drawing of each Google screen with a pulsing dot on what to tap, and one or two short lines per step.
 
-- **Google Drive** (recommended), in 7 small steps:
-  - 📄 Make a Sheet
+- **Google Drive** (recommended), in 6 small steps that all work on a phone:
   - 📋 Copy the helper code (one button)
-  - 🧩 Paste it in Extensions → Apps Script
-  - 🚀 Deploy as a Web app
+  - 🧩 Open [script.new](https://script.new) (Apps Script in the browser) and paste it
+  - 🚀 Deploy it as a Web app with access "Anyone"
   - 👍 Allow
-  - 🔗 Get the connection link from the Sheet's Gut Check menu
+  - 🔗 Copy the Web app link Google shows
   - ✅ Paste it in the app (one button)
-- **I already have a Gut Check Sheet**: for a new phone. It jumps straight to getting and pasting the link.
+
+  On that first connection the script **creates a "Gut Check log" Sheet in her Drive by itself**, so the Google Sheets app is never needed for setup. It also makes a secret key and locks itself to it, so nobody else can claim the Sheet afterwards.
+- **I already have a Gut Check Sheet**: for a new phone. Open the Sheet (the Sheets app is fine), go to the **Connect** tab, copy cell A2, and paste it.
 - **A file on this phone** (Android), or **Save a copy to Files** (iPhone).
 - **Bring back old data**: import a file or restore an automatic backup.
 - **GitHub**: for technical people.

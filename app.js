@@ -133,7 +133,7 @@ for (const t in outbox) outbox[t] = outbox[t].map(fixOp);
 
 function defaultCfg() {
   const h = location.hostname, gh = h.endsWith('.github.io');
-  return { owner: gh ? h.split('.')[0] : '', repo: 'gut-check-data', branch: '', path: 'gut-check.csv', token: '', fileName: '', gsUrl: '', gsKey: '' };
+  return { owner: gh ? h.split('.')[0] : '', repo: 'gut-check-data', branch: '', path: 'gut-check.csv', token: '', fileName: '', gsUrl: '', gsKey: '', gsSheetUrl: '' };
 }
 // Remembered twice on the device (localStorage + IndexedDB). Cookies aren't used: they'd send the
 // Sheet's secret key to the web server on every page load.
@@ -1022,7 +1022,7 @@ function placesHTML() {
   let h = row('ok', 'Inside this app', `${local.length} entries · a backup is kept each day for 30 days`);
   h += cfg.fileName ? row(tstat.file?.err ? 'warn' : 'ok', `File: ${esc(cfg.fileName)}`, placeLine('file'))
                     : row('off', FS_OK ? 'A file on this phone' : 'Copies in Files', FS_OK ? 'Not set up' : (lc ? `Last copy saved ${ago(lc)}` : 'No copy saved yet'));
-  h += gsConnected() ? row(tstat.gsheet?.err ? 'warn' : 'ok', 'Google Sheet (in Google Drive)', placeLine('gsheet')) : row('off', 'Online backup (Google Sheet)', 'Not set up');
+  h += gsConnected() ? row(tstat.gsheet?.err ? 'warn' : 'ok', 'Google Sheet: Gut Check log', placeLine('gsheet') + (cfg.gsSheetUrl ? ` · <a href="${esc(cfg.gsSheetUrl)}" target="_blank" rel="noopener">Open ↗</a>` : '')) : row('off', 'Online backup (Google Sheet)', 'Not set up');
   if (connected()) h += row(tstat.github?.err ? 'warn' : 'ok', `GitHub: ${esc(cfg.repo)}`, placeLine('github'));
   const n = 1 + targets().length;
   return `<ul class="places">${h}</ul><p class="places-sum ${n > 1 ? 'good' : 'bad'}">${n > 2 ? `✓ Saved in ${n} places. Very safe.` : n > 1 ? '✓ Saved in 2 places.' : '⚠ Only saved inside this app. Add a backup so the log can never be lost.'}</p>`;
@@ -1059,18 +1059,15 @@ const ILL = {
     <path d="M116 78 C140 52 160 52 178 66" stroke="#9ec5f4" stroke-width="3" fill="none" stroke-dasharray="6 6" class="flow"/><path d="M172 58 l9 9 l-12 3" fill="none" stroke="#9ec5f4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="M186 104 h66 a19 19 0 0 0 0 -38 a26 26 0 0 0 -50 -7 a21 21 0 0 0 -16 45z" fill="#20354f" stroke="#6da7ec" stroke-width="2.5"/>
     ${SHEETICON(206, 60, .9)}<circle cx="248" cy="96" r="13" fill="#0ca30c" stroke="#1a1a19" stroke-width="3"/><path d="M242 96 l4 4 l8 -8" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`, 'Phone saving to Google Drive'),
-  g1: svg(`${WIN(30, 12, 220, 126, 'sheets.new')}${GRID(42, 30, 196, 96)}<circle cx="236" cy="122" r="20" fill="#22a55a"/><path d="M236 112 v20 M226 122 h20" stroke="#fff" stroke-width="4" stroke-linecap="round"/>${TAP(236, 122)}`, 'A new blank Google Sheet'),
-  g2: svg(`<rect x="70" y="22" width="96" height="118" rx="10" fill="#e9edf2"/><rect x="94" y="13" width="48" height="18" rx="6" fill="#8d96a1"/>
+  copycode: svg(`<rect x="70" y="22" width="96" height="118" rx="10" fill="#e9edf2"/><rect x="94" y="13" width="48" height="18" rx="6" fill="#8d96a1"/>
     ${[[84, 46, 50, '#3987e5'], [84, 58, 66, '#22a55a'], [92, 70, 54, '#8d96a1'], [92, 82, 44, '#d95926'], [84, 94, 60, '#3987e5'], [92, 106, 40, '#8d96a1'], [84, 118, 30, '#22a55a']].map(([x, y, w, c]) => `<rect x="${x}" y="${y}" width="${w}" height="6" rx="3" fill="${c}"/>`).join('')}
     <rect x="182" y="66" width="80" height="34" rx="17" fill="#3987e5"/><text x="222" y="88" class="ib" text-anchor="middle">Copy</text>${TAP(258, 96)}`, 'Copy the code'),
-  g3: svg(`${WIN(14, 10, 252, 132)}${SHEETICON(24, 24, .5)}<text x="44" y="38" class="it2">Gut Check log</text>
-    ${['File', 'Edit', 'View', 'Insert', 'Data', 'Extensions'].map((t, i) => `<text x="${44 + i * 33}" y="52" class="im">${t}</text>`).join('')}
-    <rect x="${44 + 5 * 33 - 5}" y="42" width="58" height="14" rx="4" fill="none" stroke="#fab219" stroke-width="2"/>
-    <rect x="200" y="60" width="92" height="64" rx="6" fill="#3a3a35" stroke="#55554e" transform="translate(-30 0)"/>
-    <text x="180" y="78" class="im">Add-ons</text><text x="180" y="96" class="im">Macros</text>
-    <rect x="174" y="104" width="82" height="16" rx="4" fill="#fab219" opacity=".25"/><text x="180" y="116" class="imb">Apps Script</text>${TAP(250, 114)}
-    ${GRID(24, 62, 140, 70)}`, 'Extensions menu, then Apps Script'),
-  g4: svg(`${WIN(8, 10, 128, 130, 'Apps Script')}<rect x="78" y="24" width="52" height="16" rx="8" fill="#3987e5"/><text x="104" y="35" class="ib2" text-anchor="middle">Deploy ▾</text>
+  editor: svg(`${WIN(14, 10, 252, 132, 'script.new')}<rect x="22" y="26" width="236" height="20" rx="4" fill="#3a3a35"/>
+    <text x="34" y="40" class="it2">Untitled project</text>
+    <rect x="200" y="29" width="14" height="14" rx="2" fill="#6da7ec"/><rect x="203" y="31" width="8" height="5" fill="#fff"/><rect x="203" y="38" width="8" height="4" fill="#20354f"/>${TAP(207, 36)}
+    ${[[30, 56, 70, '#d95926'], [38, 68, 110, '#6da7ec'], [38, 80, 90, '#5fd35f'], [38, 92, 120, '#c3c2b7'], [30, 104, 40, '#d95926'], [30, 116, 80, '#6da7ec']].map(([x, y, w, c]) => `<rect x="${x}" y="${y}" width="${w}" height="6" rx="3" fill="${c}" opacity=".85"/>`).join('')}
+    <rect x="172" y="84" width="84" height="34" rx="17" fill="#f0efec"/><text x="214" y="105" class="id" text-anchor="middle">📋 Paste</text>`, 'Paste the code in Apps Script, then Save'),
+  deploy: svg(`${WIN(8, 10, 128, 130, 'Apps Script')}<rect x="78" y="24" width="52" height="16" rx="8" fill="#3987e5"/><text x="104" y="35" class="ib2" text-anchor="middle">Deploy ▾</text>
     <rect x="40" y="44" width="92" height="40" rx="5" fill="#3a3a35" stroke="#55554e"/><text x="47" y="59" class="imb">New deployment</text><text x="47" y="76" class="im">Manage…</text>${TAP(128, 58)}
     ${[50, 98, 110, 122].map((y, i) => `<rect x="18" y="${y + 40}" width="${[60, 90, 70, 50][i]}" height="4" rx="2" fill="#4a4a45"/>`).join('')}
     <path d="M140 75 h10" stroke="#9ec5f4" stroke-width="3"/><path d="M146 70 l6 5 l-6 5" stroke="#9ec5f4" stroke-width="3" fill="none"/>
@@ -1078,23 +1075,29 @@ const ILL = {
     <text x="166" y="54" class="id2">Execute as</text><rect x="166" y="58" width="96" height="14" rx="3" fill="#fff" stroke="#c3c9d1"/><text x="171" y="68" class="id">Me</text>
     <text x="166" y="86" class="id2">Who has access</text><rect x="166" y="90" width="96" height="14" rx="3" fill="#fff" stroke="#fab219" stroke-width="2.5"/><text x="171" y="100" class="id">Anyone</text>
     <rect x="216" y="112" width="46" height="16" rx="8" fill="#3987e5"/><text x="239" y="123" class="ib2" text-anchor="middle">Deploy</text>${TAP(262, 126)}`, 'Deploy as a web app, access Anyone'),
-  g5: svg(`<rect x="10" y="22" width="80" height="100" rx="9" fill="#e9edf2"/><text x="50" y="44" text-anchor="middle" style="font-size:20px">⚠️</text><text x="50" y="62" class="id" text-anchor="middle">Not verified</text>
+  allow: svg(`<rect x="10" y="22" width="80" height="100" rx="9" fill="#e9edf2"/><text x="50" y="44" text-anchor="middle" style="font-size:20px">⚠️</text><text x="50" y="62" class="id" text-anchor="middle">Not verified</text>
     <text x="22" y="98" class="ilink">Advanced</text>${TAP(74, 99)}
     <path d="M96 72 h10" stroke="#9ec5f4" stroke-width="3"/>
-    <rect x="112" y="22" width="80" height="100" rx="9" fill="#e9edf2"/><text x="152" y="44" class="id" text-anchor="middle">Advanced</text><text x="120" y="80" class="ilink">Go to Gut</text><text x="120" y="92" class="ilink">Check (unsafe)</text>${TAP(186, 94)}
+    <rect x="112" y="22" width="80" height="100" rx="9" fill="#e9edf2"/><text x="152" y="44" class="id" text-anchor="middle">Advanced</text><text x="120" y="80" class="ilink">Go to</text><text x="120" y="92" class="ilink">… (unsafe)</text>${TAP(186, 94)}
     <path d="M198 72 h10" stroke="#9ec5f4" stroke-width="3"/>
     <rect x="212" y="22" width="60" height="100" rx="9" fill="#e9edf2"/><text x="242" y="48" text-anchor="middle" style="font-size:18px">🔓</text><rect x="222" y="84" width="40" height="18" rx="9" fill="#3987e5"/><text x="242" y="96" class="ib2" text-anchor="middle">Allow</text>${TAP(264, 100)}`, 'Advanced, Go to, Allow'),
-  g6: svg(`${WIN(14, 10, 252, 132)}${SHEETICON(24, 24, .5)}<text x="44" y="38" class="it2">Gut Check log</text>
-    ${['File', 'Edit', 'View', 'Data', 'Extensions'].map((t, i) => `<text x="${44 + i * 33}" y="52" class="im">${t}</text>`).join('')}<text x="${44 + 5 * 33 + 4}" y="52" class="imb">Gut Check</text>
-    <rect x="${44 + 5 * 33}" y="42" width="56" height="14" rx="4" fill="none" stroke="#fab219" stroke-width="2"/>
-    <rect x="128" y="60" width="128" height="40" rx="6" fill="#3a3a35" stroke="#55554e"/><rect x="132" y="64" width="120" height="16" rx="4" fill="#fab219" opacity=".25"/><text x="138" y="76" class="imb">Get connection link</text>
-    <text x="138" y="94" class="im">Make a new link</text>${TAP(240, 72)}
-    ${GRID(24, 62, 96, 70)}<rect x="132" y="108" width="62" height="20" rx="10" fill="#3987e5"/><text x="163" y="122" class="ib2" text-anchor="middle">Copy link</text>${TAP(196, 124)}`, 'Gut Check menu, Get connection link, Copy link'),
-  g7: svg(`<rect x="96" y="6" width="88" height="140" rx="14" fill="#2c2c29" stroke="#55554e" stroke-width="2"/><rect x="104" y="20" width="72" height="112" rx="5" fill="#1a1a19"/>
+  weburl: svg(`<rect x="24" y="10" width="232" height="130" rx="10" fill="#e9edf2"/><text x="40" y="32" class="id" style="font-size:12px">New deployment</text>
+    <text x="40" y="50" class="id2">✓ Deployment successfully created</text>
+    <text x="40" y="72" class="id2">Web app</text>
+    <rect x="40" y="78" width="200" height="22" rx="4" fill="#fff" stroke="#fab219" stroke-width="2.5"/><text x="46" y="93" class="id" style="font-size:8.5px;font-weight:600">https://script.google.com/macros/s/…/exec</text>
+    <rect x="40" y="108" width="54" height="20" rx="10" fill="#3987e5"/><text x="67" y="122" class="ib2" text-anchor="middle">Copy</text>${TAP(96, 124)}
+    <text x="232" y="122" class="ilink" text-anchor="end">Done</text>`, 'Copy the Web app link'),
+  paste: svg(`<rect x="96" y="6" width="88" height="140" rx="14" fill="#2c2c29" stroke="#55554e" stroke-width="2"/><rect x="104" y="20" width="72" height="112" rx="5" fill="#1a1a19"/>
     <rect x="110" y="40" width="60" height="22" rx="11" fill="#f0efec"/><text x="140" y="55" class="id" text-anchor="middle">📥 Paste</text>${TAP(172, 56)}
-    <rect x="110" y="70" width="60" height="18" rx="4" fill="#2c2c29" stroke="#55554e"/><text x="114" y="82" class="im" style="font-size:7px">https://…#gsheet</text>
+    <rect x="110" y="70" width="60" height="18" rx="4" fill="#2c2c29" stroke="#55554e"/><text x="114" y="82" class="im" style="font-size:7px">https://script…</text>
     <rect x="110" y="96" width="60" height="20" rx="10" fill="#0ca30c"/><text x="140" y="110" class="ib2" text-anchor="middle">Connect ✓</text>
-    ${SHEETICON(30, 54, 1)}<path d="M72 76 h18" stroke="#9ec5f4" stroke-width="3" stroke-dasharray="4 4" class="flow"/><path d="M86 70 l6 6 l-6 6" stroke="#9ec5f4" stroke-width="3" fill="none"/>`, 'Paste the link and connect'),
+    <path d="M190 76 h18" stroke="#9ec5f4" stroke-width="3" stroke-dasharray="4 4" class="flow"/><path d="M204 70 l6 6 l-6 6" stroke="#9ec5f4" stroke-width="3" fill="none"/>${SHEETICON(222, 54, 1)}
+    <text x="238" y="114" class="it" text-anchor="middle">Gut Check log</text>`, 'Paste the link and connect'),
+  again: svg(`<rect x="70" y="6" width="140" height="140" rx="14" fill="#2c2c29" stroke="#55554e" stroke-width="2"/>${GRID(80, 22, 120, 84)}
+    <rect x="80" y="44" width="120" height="13" fill="#fff6d6" stroke="#fab219" stroke-width="2"/><text x="84" y="54" class="id" style="font-size:7.5px">https://…#gsheet=…&amp;key=…</text>${TAP(196, 51)}
+    <rect x="80" y="112" width="120" height="24" fill="#3a3a35"/><text x="98" y="128" class="im">Log</text>
+    <rect x="128" y="115" width="56" height="18" rx="9" fill="#20354f" stroke="#fab219" stroke-width="2"/><text x="156" y="128" class="imb" text-anchor="middle">Connect</text>${TAP(186, 126)}
+    <rect x="214" y="34" width="54" height="26" rx="8" fill="#f0efec"/><text x="241" y="51" class="id" text-anchor="middle">Copy</text>`, 'Connect tab, copy cell A2'),
   file: svg(`<rect x="34" y="14" width="78" height="124" rx="13" fill="#2c2c29" stroke="#55554e" stroke-width="2"/><rect x="42" y="28" width="62" height="96" rx="5" fill="#1a1a19"/>
     <path d="M52 62 h16 l5 6 h22 v34 h-43z" fill="#fab219"/><path d="M52 72 h43 v30 h-43z" fill="#ffd166"/>
     <path d="M122 76 h24" stroke="#9ec5f4" stroke-width="3" stroke-dasharray="5 5" class="flow"/><path d="M142 70 l7 6 l-7 6" stroke="#9ec5f4" stroke-width="3" fill="none"/>
@@ -1216,7 +1219,7 @@ function init() {
   $('#impFile').onchange = onImport(note);
 
   // ---------- setup wizard: a journey of small screens ----------
-  const JOURNEY = [['g1', '📄', 'Sheet'], ['g2', '📋', 'Copy'], ['g3', '🧩', 'Paste'], ['g4', '🚀', 'Turn on'], ['g5', '👍', 'Allow'], ['g6', '🔗', 'Link'], ['g7', '✅', 'Connect']];
+  const JOURNEY = [['g1', '📋', 'Copy'], ['g2', '🧩', 'Paste'], ['g3', '🚀', 'Turn on'], ['g4', '👍', 'Allow'], ['g5', '🔗', 'Link'], ['g6', '✅', 'Connect']];
   $$('.wz-ill').forEach(el => el.innerHTML = ILL[el.dataset.ill] || '');
   $$('[data-only="fs"]').forEach(el => el.hidden = !FS_OK);
   $$('[data-only="nofs"]').forEach(el => el.hidden = FS_OK);
@@ -1230,7 +1233,7 @@ function init() {
     if (j >= 0) jEl.innerHTML = JOURNEY.map(([sid, icon, label], i) => `<li class="${i < j ? 'done' : i === j ? 'now' : ''}"><button type="button" data-go="${sid}" aria-label="${label}">${i < j ? '✓' : icon}</button><span>${label}</span></li>`).join('');
     $('#wzBack').style.visibility = wzHist.length ? 'visible' : 'hidden';
     if (id === 'restore') renderBackups();
-    if (id === 'g2') loadGsCode();
+    if (id === 'g1') loadGsCode();
     refreshPlaces(); fillDev(); fillGh(); fillGs();
     $('#wizDlg .dlg').scrollTop = 0;
   }
@@ -1333,6 +1336,18 @@ function init() {
     try { if (!gsCode) await loadGsCode(); await navigator.clipboard.writeText(gsCode); m('✓ Copied! Now paste it in the Sheet.', 'ok'); $('#gsCopy').textContent = '✓ Copied'; }
     catch { m("Couldn't copy by itself. Tap “See it”, select all the text and copy it.", 'err'); }
   };
+  const WEBAPP_RE = /https:\/\/script\.google\.com\/macros\/[^\s#?"'<>]+/;
+  async function connectAny(text) {
+    if (parseConnLink(text)) return connectSheet(text);
+    const m = String(text || '').match(WEBAPP_RE);
+    if (!m) return gsmsg("That's not the link yet. In Apps Script, under Web app, tap Copy, then come back and tap Paste.", 'err');
+    gsmsg('Making your Sheet…');
+    try {
+      const j = await gsCall(fetch(`${m[0]}?claim=1&t=${Date.now()}`, { cache: 'no-store' }));
+      cfg.gsSheetUrl = j.sheetUrl || ''; saveCfg();
+      return connectSheet(`#gsheet=${encodeURIComponent(m[0])}&key=${j.key}`);
+    } catch (e) { gsmsg(e.message, 'err'); }
+  }
   async function connectSheet(link) {
     const c = parseConnLink(link);
     if (!c) return gsmsg('That doesn\'t look like a Gut Check connection link. In the Sheet use Gut Check → Get connection link, and copy the whole link.', 'err');
@@ -1346,19 +1361,19 @@ function init() {
     try {
       const t = await navigator.clipboard.readText();
       $('#gsLink').value = t;
-      parseConnLink(t) ? connectSheet(t) : gsmsg("That's not the Gut Check link yet. Copy it from the Sheet (step 🔗), then tap Paste again.", 'err');
+      connectAny(t);
     } catch { gsmsg('Long-press the box below and choose Paste, then tap Connect.', 'err'); $('#gsLink').focus(); }
   };
-  $('#gsConnect').onclick = () => connectSheet($('#gsLink').value);
+  $('#gsConnect').onclick = () => connectAny($('#gsLink').value);
   $('#gsDisconnect').onclick = () => {
-    cfg.gsUrl = ''; cfg.gsKey = ''; saveCfg(); delete outbox.gsheet; delete tstat.gsheet; save(K.out, outbox); save(K.tstat, tstat);
+    cfg.gsUrl = ''; cfg.gsKey = ''; cfg.gsSheetUrl = ''; saveCfg(); delete outbox.gsheet; delete tstat.gsheet; save(K.out, outbox); save(K.tstat, tstat);
     fillGs(); refreshPlaces(); setStatus(); renderBanner(); gsmsg('Disconnected. Nothing in the Sheet was deleted, and every entry is still in the app.');
   };
   // opening the connection link itself (e.g. tapped in an email) connects too, after asking
   function connectFromHash() {
     if (!/gsheet=/.test(location.hash)) return;
     const link = location.hash; history.replaceState(null, '', location.pathname + location.search);
-    if (confirm('Connect Gut Check to your Google Sheet? Every entry will be saved there too.')) { openWizard('g7'); connectSheet(link); }
+    if (confirm('Connect Gut Check to your Google Sheet? Every entry will be saved there too.')) { openWizard('g6'); connectSheet(link); }
   }
 
   // step 3: bring in data
