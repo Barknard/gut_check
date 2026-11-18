@@ -1,55 +1,48 @@
 # Gut Check
 
-A tiny, phone-first tracker for bowel movements (Bristol stool scale 1–7), **vomiting**, **MiraLAX** and **Gas-X**.
+A tiny, phone-first tracker for bowel movements (Bristol stool scale 1–7), **vomiting**, **Imodium** and **Gas-X**.
 
 - **Log tab:** three KPIs (poops/day, average stool type, time between poops) and four big buttons.
   Tap **Poop** to pick a Bristol type (with a "15m / 30m / 1h ago" option), or tap Vomit or a medicine to log it instantly.
   Every log shows an **Undo** toast.
 - **History tab:** every entry, grouped by day. Tap a row to change its time or type; tap the trash icon twice to delete it (with Undo).
 - **Start over:** ⚙️ → **Delete all entries…** asks for confirmation (with a "download a backup first" button), deletes everything wherever it's saved, and offers Undo for 10 seconds. Settings are kept.
-- **Details tab:** pattern sentences (e.g. *"After MiraLAX, the next poop typically comes 3h 50m later"*), plus charts for
+- **Details tab:** pattern sentences (e.g. *"After Imodium, the next poop typically comes 3h 50m later"*), plus charts for
   poops per day with medicine doses, stool type over time, type mix, medicine timing (before / during / after a poop),
-  vomiting (how often, and how often it follows MiraLAX or Gas-X), time of day, and weekly averages.
+  vomiting (how often, and how often it follows Imodium or Gas-X), time of day, and weekly averages.
 
 No build step and no server. It's plain HTML, CSS and JS served by GitHub Pages.
 
-## Where the data lives
+## Where the data lives (and why it won't get lost)
 
-Entries are always kept inside the app on the phone. On top of that, **Settings (⚙️)** offers one of two places to save:
+Everything is saved in up to **three places at once**. The badge at the top of the app says how many, e.g. "Saved in 3 places".
 
-**1. A spreadsheet file on the phone**: Android (Chrome) and computers (Chrome or Edge)
-- Tap **Create new file…** or **Use existing file…** and pick any folder: Downloads, Documents, Google Drive and so on.
-- After that, every tap is written straight into that file. The app re-reads it each time it opens, so edits made in Excel show up too.
-- Name it **`.xlsx`** for a real Excel file or **`.csv`** for a plain one.
-- After a while Chrome may ask again. The badge at the top then says **Tap to reconnect**; one tap restores access. Entries made in the meantime wait in the app and are written on reconnect.
-- **iPhone and iPad can't do this.** Apple doesn't let any website stay linked to a file. On iPhone the same box shows **Save copy to Files**, which saves a copy into a folder she chooses. **Import file…** reads a copy back in.
+1. **Inside the app on the phone.** Always on. The app also keeps an **automatic backup for each of the last 30 days**, plus one taken just before "Delete all". Any of them can be restored.
+2. **A spreadsheet file on the phone** (`.xlsx` or `.csv`). Android (Chrome) and computers (Chrome or Edge) only. Picking a Google Drive folder also gets the file off the phone. iPhones can't do this, so they get a **Save a copy to Files** button instead.
+3. **A private GitHub repository** (online, free). Saves automatically, keeps every past version, and lets more than one phone share the log. The app refuses to save to a public repository.
 
-**2. A private GitHub repo**: backed up, and several phones can share one log
-- The log is stored as `gut-check.csv` in a **separate private repo** (default name `gut-check-data`).
-- The app **refuses to save to a public repo**.
+How the copies stay in step:
+- Every place gets every entry. If one place is unreachable (no internet, file permission expired), the others still save, and the missed changes are sent as soon as it's back.
+- Anything new found in one place (another phone, a row added in Excel) is copied to the others.
+- **Only deleting in the app removes an entry**, and only after a confirmation or with Undo. A missing or old copy can never wipe out data.
+- If saving has been failing for over an hour, or the log is only inside the app, a warning appears on the home screen.
 
-Both use the same columns:
+All copies use the same columns:
 
 | id | timestamp | date | time | weekday | event | bristol_type | bristol_description |
 |---|---|---|---|---|---|---|---|
 | mwl…| 2026-11-18T08:12:00-05:00 | 2026-11-18 | 08:12 | Wed | Poop | 4 | Like a sausage or snake, smooth and soft |
 
-- Two phones can log to the same GitHub file. If both save at the same moment, the app reloads the file and merges the entries instead of overwriting.
-- **Settings → Download Excel / Download CSV** exports everything at any time.
-  **Import file…** reads `.xlsx`, `.csv` or `.txt` files and skips duplicate rows.
+`event` is one of `Poop`, `Vomit`, `Imodium`, `Gas-X`. Entries logged before the rename say `MiraLAX` in old files and are read as Imodium.
 
 ## Setup
 
-Only needed for the GitHub option. The phone-file option needs no setup beyond picking the file.
+Open the app, tap ⚙️, then **Set up saving & backups**. The wizard walks through:
+1. **A file on this phone**: create or pick the spreadsheet.
+2. **Online backup**: links open GitHub with the repository name, "Private", and the access key's permission already filled in.
+3. **Bring in existing data**: import an Excel/CSV/text file, or restore one of the automatic backups.
 
-1. **Site:** in this repo, open **Settings → Pages → Deploy from a branch → `main` / root**.
-   The site is at `https://<owner>.github.io/<repo>/`.
-2. **Data repo:** create a new **private** repo named `gut-check-data` at <https://github.com/new>.
-   Ticking "Add a README" is fine; the app creates the CSV itself.
-3. **Token:** at <https://github.com/settings/personal-access-tokens/new>, create a **fine-grained** token with
-   repository access **Only select repositories → `gut-check-data`** and permission **Contents → Read and write**.
-4. **Phone:** open the site, tap ⚙️, check that Owner is right and Private repo says `gut-check-data`, paste the token,
-   and tap **Save & connect**. Then use **Share → Add to Home Screen**. The token is stored only on that phone.
+To publish the site itself: in this repo, **Settings → Pages → Deploy from a branch → `main` / root**.
 
 ## App icon not showing?
 

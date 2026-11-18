@@ -43,9 +43,11 @@
       <div class="actions" id="actions">
         <button class="act act-poop" data-act="poop" type="button"><span class="act-ico" data-icon="poop"></span><span class="act-label">Poop</span></button>
         <button class="act act-vomit" data-act="vomit" type="button"><span class="act-ico" data-icon="vomit"></span><span class="act-label">Vomit</span></button>
-        <button class="act act-mira" data-act="miralax" type="button"><span class="act-ico" data-icon="miralax"></span><span class="act-label">MiraLAX</span></button>
+        <button class="act act-imod" data-act="imodium" type="button"><span class="act-ico" data-icon="imodium"></span><span class="act-label">Imodium</span></button>
         <button class="act act-gasx" data-act="gasx" type="button"><span class="act-ico" data-icon="gasx"></span><span class="act-label">Gas-X</span></button>
       </div>
+
+      <div class="banner" id="banner" role="alert" hidden></div>
 
       <div class="picker" id="picker" hidden>
         <div class="picker-head">
@@ -70,7 +72,7 @@
         <button class="chip is-on" data-f="all" type="button">All</button>
         <button class="chip" data-f="poop" type="button">Poop</button>
         <button class="chip" data-f="vomit" type="button">Vomit</button>
-        <button class="chip" data-f="miralax" type="button">MiraLAX</button>
+        <button class="chip" data-f="imodium" type="button">Imodium</button>
         <button class="chip" data-f="gasx" type="button">Gas-X</button>
       </div>
       <div id="historyList"></div>
@@ -112,44 +114,12 @@
 
 <!-- Settings -->
 <dialog id="setDlg">
-  <form method="dialog" class="dlg" id="setForm">
+  <form method="dialog" class="dlg">
     <h2>Settings</h2>
-    <p class="hint">Entries are always kept inside the app on this phone. You can also save them to a spreadsheet file on the phone, or to a private GitHub repo so they're backed up and other phones can use them. Pick one.</p>
     <fieldset>
-      <legend>Save to a file on this phone</legend>
-      <div id="devYes">
-        <p class="set-line" id="devState">No file linked yet.</p>
-        <div class="dlg-row wrap">
-          <button type="button" class="primary" id="devNew">Create new file…</button>
-          <button type="button" class="ghost" id="devOpen">Use existing file…</button>
-          <button type="button" class="ghost" id="devUnlink">Unlink</button>
-        </div>
-        <p class="hint">Choose any folder, e.g. Downloads, Documents or Google Drive. Every tap is saved straight into that file, and the app reads it again whenever it opens, so changes made in Excel show up too. End the name in <b>.xlsx</b> for an Excel file or <b>.csv</b> for a plain one. If "Create new file" won't save, pick an existing spreadsheet with "Use existing file" instead.</p>
-      </div>
-      <div id="devNo" hidden>
-        <p class="hint">This browser can't stay linked to a file. iPhone and iPad don't allow that for any website. Tap <b>Save copy to Files</b> and choose a folder (On My iPhone, iCloud Drive…), and use <b>Import file</b> below to read a copy back in.</p>
-        <div class="dlg-row wrap"><button type="button" class="primary" id="devShare">Save copy to Files</button></div>
-      </div>
-      <span id="devMsg" class="set-msg"></span>
-    </fieldset>
-    <fieldset>
-      <legend>Or save to GitHub</legend>
-      <div class="two">
-        <label>Owner<input id="sOwner" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-        <label>Private repo<input id="sRepo" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-      </div>
-      <div class="two">
-        <label>Branch<input id="sBranch" placeholder="default" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-        <label>File<input id="sPath" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-      </div>
-      <label>Access token <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">make one</a>
-        <input id="sToken" type="password" autocomplete="off" placeholder="github_pat_…" spellcheck="false"></label>
-      <p class="hint">Use a fine-grained token limited to just that private repository with <b>Contents: Read and write</b>. The token stays on this phone only.</p>
-      <div class="dlg-row">
-        <span id="setMsg" class="set-msg"></span><span class="grow"></span>
-        <button type="button" class="ghost" id="setDisconnect">Disconnect</button>
-        <button type="button" class="primary" id="setSave">Save &amp; connect</button>
-      </div>
+      <legend>Where the log is saved</legend>
+      <div class="places-box"></div>
+      <button type="button" class="primary wide" id="openWizard">Set up saving &amp; backups</button>
     </fieldset>
     <fieldset>
       <legend>Files</legend>
@@ -158,14 +128,115 @@
         <button type="button" class="ghost" id="expCsv">Download CSV</button>
         <label class="ghost filebtn">Import file…<input type="file" id="impFile" accept=".csv,.txt,.tsv,.xlsx,.xls,text/csv,text/plain"></label>
       </div>
-      <p class="hint">Import reads Excel, CSV or text files. It needs a date/time column and an event column (Poop, Vomit, MiraLAX or Gas-X). A Bristol type column is optional. Duplicate rows are skipped.</p>
+      <p class="hint">Import reads Excel, CSV or text files with a date/time column and an event column (Poop, Vomit, Imodium or Gas-X). A Bristol type column is optional. Nothing is overwritten and duplicates are skipped.</p>
+      <span id="setNote" class="set-msg"></span>
     </fieldset>
     <fieldset class="danger-zone">
       <legend>Start over</legend>
       <div class="dlg-row"><button type="button" class="danger" id="resetOpen">Delete all entries…</button></div>
-      <p class="hint">Removes every entry from the app and from the linked file or GitHub file. You'll be asked to confirm first.</p>
+      <p class="hint">Removes every entry from the app and from every place it's saved. You'll be asked to confirm, and a backup is kept inside the app.</p>
     </fieldset>
     <div class="dlg-row"><span class="grow"></span><button class="primary" value="close">Done</button></div>
+  </form>
+</dialog>
+
+<!-- Setup wizard: where to save, and where to load from -->
+<dialog id="wizDlg" class="wiz">
+  <form method="dialog" class="dlg" onsubmit="return false">
+    <div class="wz-top"><div class="wz-dots" id="wzDots"></div><button type="button" class="icon-btn" id="wzClose" aria-label="Close">✕</button></div>
+
+    <section class="wz-step">
+      <h2>Keep the log safe</h2>
+      <p>Every tap is saved inside this app. But if the phone is lost, reset, or the browser's data is cleared, anything saved only there is gone.</p>
+      <p>This setup saves the log in <b>more than one place</b>, so one copy can always be recovered. It takes about 5 minutes.</p>
+      <div class="places-box"></div>
+    </section>
+
+    <section class="wz-step" hidden>
+      <p class="wz-kicker">Step 1 of 3</p>
+      <h2>Save a file on this phone</h2>
+      <div id="devYes">
+        <p>Pick a folder on the phone and the app keeps a spreadsheet there. Every tap goes straight into it, and Excel or Google Sheets can open it.</p>
+        <ol class="wz-list">
+          <li>Tap <b>Create new file</b>.</li>
+          <li>Choose a folder. <b>Best:</b> a <b>Google Drive</b> folder, so the file is also copied off the phone. <b>Documents</b> or <b>Downloads</b> also work.</li>
+          <li>Keep the name <b>gut-check.xlsx</b> (Excel) or change the end to <b>.csv</b>, then tap <b>Save</b>.</li>
+          <li>If the phone asks whether Gut Check may edit the file, tap <b>Allow</b>.</li>
+        </ol>
+        <p class="set-line" id="devState"></p>
+        <div class="dlg-row wrap">
+          <button type="button" class="primary" id="devNew">Create new file…</button>
+          <button type="button" class="ghost" id="devOpen">Use existing file…</button>
+          <button type="button" class="ghost" id="devUnlink">Unlink</button>
+        </div>
+        <p class="hint">Already have a Gut Check file, or "Create new file" won't save? Use <b>Use existing file</b> and pick it. Nothing already in it is lost; the two are combined.</p>
+      </div>
+      <div id="devNo" hidden>
+        <p>iPhones don't let any website keep a file up to date by itself. Instead:</p>
+        <ul class="wz-list">
+          <li>Set up the <b>online backup</b> in the next step. It saves automatically and is the safest option on iPhone.</li>
+          <li>Also, every week or two, tap <b>Save a copy to Files</b> below and choose <b>iCloud Drive</b> or <b>On My iPhone</b>.</li>
+        </ul>
+        <div class="dlg-row wrap"><button type="button" class="primary" id="devShare">Save a copy to Files</button></div>
+        <p class="hint" id="lastCopy"></p>
+      </div>
+      <span id="devMsg" class="set-msg"></span>
+    </section>
+
+    <section class="wz-step" id="wzGh" hidden>
+      <p class="wz-kicker">Step 2 of 3 · Recommended</p>
+      <h2>Back up online (free)</h2>
+      <p>Saves to a <b>private</b> storage space on GitHub that only you can see. It saves automatically, keeps every past version, and lets another phone use the same log.</p>
+      <p class="set-line" id="ghState"></p>
+      <ol class="wz-list">
+        <li>Sign in to GitHub, or make a free account. <a href="https://github.com/signup" target="_blank" rel="noopener">Open GitHub</a></li>
+        <li><a id="ghRepoLink" href="https://github.com/new" target="_blank" rel="noopener">Create the storage space</a>. The name <b class="repo-name">gut-check-data</b> and <b>Private</b> are filled in. Check that Private is selected, then press <b>Create repository</b>.</li>
+        <li><a id="ghTokenLink" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create an access key</a>. On that page:
+          <ul>
+            <li>Under <b>Repository access</b>, choose <b>Only select repositories</b>, then pick <b class="repo-name">gut-check-data</b>.</li>
+            <li>Check that <b>Contents</b> says <b>Read and write</b>.</li>
+            <li>Press <b>Generate token</b>, then copy the key it shows.</li>
+          </ul></li>
+        <li>Come back here, fill in the boxes below, and press <b>Connect</b>.</li>
+      </ol>
+      <label>GitHub username<input id="sOwner" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="your-username"></label>
+      <label>Storage space (repository) name<input id="sRepo" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+      <label>Access key<input id="sToken" type="password" autocomplete="off" placeholder="github_pat_…" spellcheck="false"></label>
+      <details class="adv"><summary>Advanced</summary>
+        <div class="two">
+          <label>Branch<input id="sBranch" placeholder="default" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+          <label>File<input id="sPath" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+        </div>
+      </details>
+      <p class="hint">The key stays on this phone. The app refuses to save to a public repository.</p>
+      <div class="dlg-row">
+        <button type="button" class="ghost" id="setDisconnect">Disconnect</button><span class="grow"></span>
+        <button type="button" class="primary" id="setSave">Connect</button>
+      </div>
+      <span id="setMsg" class="set-msg"></span>
+    </section>
+
+    <section class="wz-step" hidden>
+      <p class="wz-kicker">Step 3 of 3</p>
+      <h2>Bring in existing data</h2>
+      <p>A file or GitHub you just linked has already been read in. Use this if there's another log file to add, such as a copy saved earlier. Nothing is overwritten and duplicates are skipped.</p>
+      <div class="dlg-row"><label class="ghost filebtn">Import a file…<input type="file" id="wzImp" accept=".csv,.txt,.tsv,.xlsx,.xls,text/csv,text/plain"></label></div>
+      <h3 class="wz-h3">Automatic backups inside the app</h3>
+      <p class="hint">The app keeps a copy each day for the last 30 days. Restore puts back anything that's missing and doesn't remove anything.</p>
+      <div id="bkList" class="bk-list"></div>
+      <span id="wzImpMsg" class="set-msg"></span>
+    </section>
+
+    <section class="wz-step" hidden>
+      <h2>All set</h2>
+      <div class="places-box"></div>
+      <p class="hint">The badge at the top of the app shows how many places the log is saved in. If saving ever stops working, a warning appears on the home screen.</p>
+    </section>
+
+    <div class="wz-nav">
+      <button type="button" class="ghost" id="wzBack">Back</button><span class="grow"></span>
+      <button type="button" class="primary" id="wzNext">Next</button>
+    </div>
   </form>
 </dialog>
 

@@ -1,4 +1,4 @@
-/* Gut Check: a tiny tracker for bowel movements, vomiting, MiraLAX and Gas-X.
+/* Gut Check: a tiny tracker for bowel movements, vomiting, Imodium and Gas-X.
  * Data lives in a CSV file in a GitHub repo (Excel opens it directly).
  * Writes go through the GitHub Contents API with a token kept on the device.
  * Every change is queued locally first, so taps never get lost offline. */
@@ -9,12 +9,12 @@
 const EV = {
   poop:    { label: 'Poop',    csv: 'Poop',    color: 'var(--poop)', hex: '#d95926' },
   vomit:   { label: 'Vomit',   csv: 'Vomit',   color: 'var(--vomit)', hex: '#e3cf5a' },
-  miralax: { label: 'MiraLAX', csv: 'MiraLAX', color: 'var(--mira)', hex: '#3987e5' },
+  imodium: { label: 'Imodium', csv: 'Imodium', color: 'var(--imod)', hex: '#3987e5' },
   gasx:    { label: 'Gas-X',   csv: 'Gas-X',   color: 'var(--gasx)', hex: '#199e70' },
 };
-const MEDS = ['miralax', 'gasx'];
-const STRIP = [['vomit', 'V'], ['miralax', 'Mx'], ['gasx', 'Gx']]; // event rows under the charts
-const EMOJI = { poop: '💩', vomit: '🤢', miralax: '💧', gasx: '🫧' };
+const MEDS = ['imodium', 'gasx'];
+const STRIP = [['vomit', 'V'], ['imodium', 'Im'], ['gasx', 'Gx']]; // event rows under the charts
+const EMOJI = { poop: '💩', vomit: '🤢', imodium: '💊', gasx: '🫧' };
 // vomit shares the chart with 3 other hues, so it is always drawn as a diamond (never color alone)
 const mark = (ev, cx, cy, r, attrs = '') => ev === 'vomit'
   ? `<path d="M${cx} ${cy-r*1.25} l${r*1.25} ${r*1.25} l-${r*1.25} ${r*1.25} l-${r*1.25} -${r*1.25} z" fill="${EV[ev].color}" ${attrs}/>`
@@ -30,7 +30,7 @@ const BRISTOL = [null,
 ];
 const BCOL = [null, '#e66767', '#b8605b', '#8a7570', '#6f6e69', '#6f86a8', '#4f86d0', '#5598e7'];
 const MIN = 60e3, HOUR = 36e5, DAY = 864e5;
-const K = { snap: 'gl.snapshot', pend: 'gl.pending', cfg: 'gl.cfg', ui: 'gl.ui' };
+const K = { snap: 'gl.snapshot', pend: 'gl.pending', out: 'gl.outbox', tstat: 'gl.tstat', copy: 'gl.lastcopy', cfg: 'gl.cfg', ui: 'gl.ui' };
 
 /* ---------- icons ---------- */
 const BR = '#8b5a2b', BR2 = '#a8723f', BR3 = '#5e3b1b';
@@ -47,15 +47,15 @@ const ICON = {
     <path d="M25 46 Q32 52.5 39 46" stroke="#1a1a19" stroke-width="2.6" fill="none" stroke-linecap="round"/>
     <circle cx="19" cy="44" r="2.6" fill="#e87ba4" opacity=".55"/><circle cx="45" cy="44" r="2.6" fill="#e87ba4" opacity=".55"/>
   </svg>`,
-  miralax: `<svg viewBox="0 0 64 64" aria-hidden="true">
-    <rect x="21" y="5" width="22" height="11" rx="3" fill="#3987e5"/>
-    <rect x="21" y="8" width="22" height="2" fill="#2a6dc0"/>
-    <rect x="23" y="15" width="18" height="5" fill="#c9d1db"/>
-    <rect x="14" y="19" width="36" height="40" rx="9" fill="#e9edf2"/>
-    <rect x="14" y="31" width="36" height="17" fill="#3987e5"/>
-    <rect x="18" y="23" width="4" height="32" rx="2" fill="#fff" opacity=".6"/>
-    <path d="M27 36 h10 l-1.5 7 h-7 z" fill="#fff"/>
-    <circle cx="30" cy="34" r="1.3" fill="#fff"/><circle cx="33.5" cy="33" r="1.1" fill="#fff"/><circle cx="35" cy="35" r="1" fill="#fff"/>
+  imodium: `<svg viewBox="0 0 64 64" aria-hidden="true">
+    <g transform="rotate(-12 32 33)">
+      <rect x="11" y="7" width="42" height="52" rx="7" fill="#dfe3e8"/>
+      <rect x="11" y="7" width="42" height="52" rx="7" fill="none" stroke="#aeb6c0" stroke-width="1.5"/>
+      <rect x="15" y="10" width="4" height="46" rx="2" fill="#fff" opacity=".55"/>
+      <rect x="17.5" y="14.5" width="13" height="9" rx="4.5" fill="#f4f6f8" stroke="#bcc3cc" stroke-width="1.2"/><rect x="19.5" y="16.4" width="9" height="5.2" rx="2.6" fill="#3987e5"/><rect x="24" y="16.4" width="4.5" height="5.2" rx="0" fill="#7fb2f0"/><path d="M25.9 16.4 a2.6 2.6 0 0 1 0 5.2" fill="#7fb2f0"/><rect x="33.5" y="14.5" width="13" height="9" rx="4.5" fill="#f4f6f8" stroke="#bcc3cc" stroke-width="1.2"/><rect x="35.5" y="16.4" width="9" height="5.2" rx="2.6" fill="#3987e5"/><rect x="40" y="16.4" width="4.5" height="5.2" rx="0" fill="#7fb2f0"/><path d="M41.9 16.4 a2.6 2.6 0 0 1 0 5.2" fill="#7fb2f0"/><rect x="17.5" y="27.5" width="13" height="9" rx="4.5" fill="#f4f6f8" stroke="#bcc3cc" stroke-width="1.2"/><rect x="19.5" y="29.4" width="9" height="5.2" rx="2.6" fill="#3987e5"/><rect x="24" y="29.4" width="4.5" height="5.2" rx="0" fill="#7fb2f0"/><path d="M25.9 29.4 a2.6 2.6 0 0 1 0 5.2" fill="#7fb2f0"/><rect x="33.5" y="27.5" width="13" height="9" rx="4.5" fill="#f4f6f8" stroke="#bcc3cc" stroke-width="1.2"/><rect x="35.5" y="29.4" width="9" height="5.2" rx="2.6" fill="#3987e5"/><rect x="40" y="29.4" width="4.5" height="5.2" rx="0" fill="#7fb2f0"/><path d="M41.9 29.4 a2.6 2.6 0 0 1 0 5.2" fill="#7fb2f0"/><rect x="17.5" y="40.5" width="13" height="9" rx="4.5" fill="#f4f6f8" stroke="#bcc3cc" stroke-width="1.2"/><rect x="19.5" y="42.4" width="9" height="5.2" rx="2.6" fill="#3987e5"/><rect x="24" y="42.4" width="4.5" height="5.2" rx="0" fill="#7fb2f0"/><path d="M25.9 42.4 a2.6 2.6 0 0 1 0 5.2" fill="#7fb2f0"/>
+      <rect x="33.5" y="40.5" width="13" height="9" rx="4.5" fill="#c9cfd7" stroke="#aeb6c0" stroke-width="1.2"/>
+      <path d="M35 42 l3 2.5 l2.5 -2 l3 3 l2 -1.5" stroke="#8d96a1" stroke-width="1.2" fill="none" stroke-linejoin="round"/>
+    </g>
   </svg>`,
   vomit: `<svg viewBox="0 0 64 64" aria-hidden="true">
     <circle cx="32" cy="26" r="20" fill="#b5d98a"/>
@@ -103,20 +103,38 @@ const BICON = [null,
 ];
 const iconFor = e => e.ev === 'poop' && e.b ? BICON[e.b] : ICON[e.ev];
 
-/* ---------- storage ---------- */
+/* ---------- storage ----------
+ * `local` is the whole log as this phone knows it. It is always kept in browser storage, with a
+ * daily copy kept for 30 days. Extra places ("targets": a file on this phone, a private GitHub
+ * repo) each hold a full copy. Each target has an outbox of changes made here that it hasn't
+ * received yet. A sync makes the target hold everything this phone has, and pulls in anything
+ * new it holds (another phone, edits made in Excel). Only a delete made in this app ever
+ * removes an entry, so nothing is lost by a missing or out-of-date copy. */
 const load = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const fixEv = e => e && e.ev === 'miralax' ? { ...e, ev: 'imodium' } : e; // the Imodium button used to say MiraLAX
+const fixOp = o => o.op === 'add' ? { ...o, e: fixEv(o.e) } : o;
 
-let snapshot = load(K.snap, []);       // last known server state (or local-only state)
-let pending = load(K.pend, []);        // ops not yet written to GitHub
+let local = load(K.snap, []).map(fixEv);
+let outbox = load(K.out, null);
+let tstat = load(K.tstat, {});   // per target: { ok: last successful save, err: last problem, errAt: when it started }
 let cfg = Object.assign(defaultCfg(), load(K.cfg, {}));
 let ui = Object.assign({ tab: 'home', range: 14, hf: 'all' }, load(K.ui, {}));
+if (!outbox) { // first run of this version: fold in changes the old version hadn't saved yet
+  const old = load(K.pend, []).map(fixOp);
+  local = applyOps(local, old);
+  outbox = { file: old.slice(), github: old.slice() };
+  save(K.snap, local); save(K.out, outbox);
+  try { localStorage.removeItem(K.pend); } catch {}
+}
+for (const t in outbox) outbox[t] = outbox[t].map(fixOp);
 
 function defaultCfg() {
   const h = location.hostname, gh = h.endsWith('.github.io');
-  return { owner: gh ? h.split('.')[0] : '', repo: 'gut-check-data', branch: '', path: 'gut-check.csv', token: '' };
+  return { owner: gh ? h.split('.')[0] : '', repo: 'gut-check-data', branch: '', path: 'gut-check.csv', token: '', fileName: '' };
 }
 const connected = () => !!(cfg.owner && cfg.repo && cfg.token && cfg.path);
+const targets = () => [cfg.fileName && 'file', connected() && 'github'].filter(Boolean);
 
 function applyOps(list, ops) {
   const m = new Map(list.map(e => [e.id, { ...e }]));
@@ -127,12 +145,13 @@ function applyOps(list, ops) {
   }
   return [...m.values()].sort((a, b) => a.ts - b.ts);
 }
-const entries = () => applyOps(snapshot, pending);
+const entries = () => local;
 
 function queue(...ops) {
-  pending.push(...ops); save(K.pend, pending);
-  if (!backend()) { snapshot = entries(); pending = []; save(K.snap, snapshot); save(K.pend, pending); }
-  render(); scheduleSync();
+  local = applyOps(local, ops); save(K.snap, local);
+  for (const t of targets()) (outbox[t] = outbox[t] || []).push(...ops);
+  save(K.out, outbox);
+  render(); scheduleSync(); scheduleBackup();
 }
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
@@ -169,7 +188,7 @@ function parseDelimited(text) {
 function evFrom(s) {
   s = String(s || '').toLowerCase();
   if (/vomit|throw|puk|emesis|🤮|🤢/.test(s)) return 'vomit';
-  if (/mira|lax|peg|polyeth/.test(s)) return 'miralax';
+  if (/imod|loper|mira|lax|peg|polyeth/.test(s)) return 'imodium'; // older logs said MiraLAX for this button
   if (/gas|simeth/.test(s)) return 'gasx';
   if (/poo|stool|bm|bowel|movement|💩/.test(s)) return 'poop';
   return null;
@@ -243,6 +262,7 @@ async function fetchRemote() {
   return { sha: j.sha, list: rowsToEntries(parseDelimited(text)) };
 }
 function commitMsg(ops) {
+  if (!ops.length) return 'Gut Check: copy entries from this phone';
   if (ops.length > 1) return `Gut Check: ${ops.length} changes`;
   const o = ops[0];
   if (o.op === 'add') return `Log ${EV[o.e.ev].label}${o.e.b ? ` (type ${o.e.b})` : ''} ${dayKey(o.e.ts)} ${hm(o.e.ts)}`;
@@ -250,8 +270,8 @@ function commitMsg(ops) {
 }
 
 /* ---------- device file (File System Access: Chrome on Android, Chrome/Edge on computers) ----------
- * The person picks a file anywhere on the device once; we keep the handle in IndexedDB and
- * read + rewrite that same file on every change. iPhone Safari has no equivalent API. */
+ * The person picks a file anywhere on the device once. The handle is kept in IndexedDB, and that
+ * same file is re-read and rewritten on every change. iPhone Safari has no equivalent API. */
 const FS_OK = 'showSaveFilePicker' in window || 'showOpenFilePicker' in window;
 let fileHandle = null, filePerm = 'granted';
 const idb = (() => {
@@ -265,9 +285,9 @@ const idb = (() => {
     const t = d.transaction('kv', mode), q = fn(t.objectStore('kv'));
     t.oncomplete = () => res(q.result); t.onerror = () => rej(t.error);
   }); };
-  return { get: k => tx('readonly', st => st.get(k)), set: (k, v) => tx('readwrite', st => st.put(v, k)), del: k => tx('readwrite', st => st.delete(k)) };
+  return { get: k => tx('readonly', st => st.get(k)), set: (k, v) => tx('readwrite', st => st.put(v, k)),
+    del: k => tx('readwrite', st => st.delete(k)), keys: () => tx('readonly', st => st.getAllKeys()) };
 })();
-const backend = () => fileHandle ? 'file' : connected() ? 'github' : null;
 const isXlsx = h => /\.xlsx$/i.test(h.name);
 async function permOf(h, ask) {
   const m = ask ? h.requestPermission : h.queryPermission;
@@ -282,61 +302,124 @@ async function readDeviceFile() {
   }
   return rowsToEntries(parseDelimited(await f.text()));
 }
-async function syncFile() {
-  filePerm = await permOf(fileHandle, false);
-  if (filePerm !== 'granted') throw new Error('Tap “Tap to reconnect” to let the app use the file again.');
-  const read = await readDeviceFile();
-  const ops = pending.slice();
-  const merged = applyOps(read === null ? snapshot : read, ops); // empty file: start from what this phone knows
-  if (ops.length || read === null) {
-    const data = isXlsx(fileHandle) ? await xlsxBlob(merged) : new Blob([toCSV(merged)], { type: 'text/csv' });
-    const w = await fileHandle.createWritable(); await w.write(data); await w.close();
-  }
-  snapshot = merged; pending = pending.slice(ops.length);
-}
-// Switching where entries live: hand everything to the new place as adds (merged by id there).
-function carryOver() { pending = entries().map(e => ({ op: 'add', e })); snapshot = []; save(K.pend, pending); save(K.snap, snapshot); }
 
-let syncing = false, again = false, syncTimer = 0, branchOk = false, lastErr = '';
-function scheduleSync(ms = 1200) { clearTimeout(syncTimer); syncTimer = setTimeout(sync, ms); }
-async function syncGithub() {
-  if (!branchOk) { await checkRepo(); branchOk = true; }
+/* ---------- saving to every place ---------- */
+class PermError extends Error {}
+const PLACE = { file: () => cfg.fileName, github: () => 'GitHub' };
+const IO = {
+  file: {
+    async read() {
+      filePerm = await permOf(fileHandle, false);
+      if (filePerm !== 'granted') throw new PermError('perm');
+      const list = await readDeviceFile();
+      return { list: list || [], ver: null, empty: list === null };
+    },
+    async write(list) {
+      const data = isXlsx(fileHandle) ? await xlsxBlob(list) : new Blob([toCSV(list)], { type: 'text/csv' });
+      const w = await fileHandle.createWritable(); await w.write(data); await w.close();
+      return true;
+    },
+  },
+  github: {
+    async read() {
+      if (!branchOk) { await checkRepo(); branchOk = true; }
+      const { sha, list } = await fetchRemote();
+      return { list, ver: sha, empty: !sha };
+    },
+    async write(list, sha, ops) {
+      const body = { message: commitMsg(ops), content: b64enc(toCSV(list)) };
+      if (activeBranch) body.branch = activeBranch;
+      if (sha) body.sha = sha;
+      const r = await api(`/contents/${filePath()}`, { method: 'PUT', body: JSON.stringify(body) });
+      if (r.ok) return true;
+      if (r.status === 409 || r.status === 422) return false; // another phone saved first: re-read and retry
+      throw new HttpError(r, r.status === 403 || r.status === 404 ? 'The access key needs “Contents: Read and write” on this repository.' : null);
+    },
+  },
+};
+const same = (a, b) => Math.floor(a.ts / 1000) === Math.floor(b.ts / 1000) && a.ev === b.ev && (a.b || null) === (b.b || null);
+const byTs = m => [...m.values()].sort((a, b) => a.ts - b.ts);
+
+async function syncTarget(t) {
   for (let attempt = 0; ; attempt++) {
-    const { sha, list } = await fetchRemote();
-    const ops = pending.slice();
-    if (!ops.length) { snapshot = list; break; }
-    const merged = applyOps(list, ops);
-    const body = { message: commitMsg(ops), content: b64enc(toCSV(merged)) };
-    if (activeBranch) body.branch = activeBranch;
-    if (sha) body.sha = sha;
-    const r = await api(`/contents/${filePath()}`, { method: 'PUT', body: JSON.stringify(body) });
-    if (r.ok) { snapshot = merged; pending = pending.slice(ops.length); break; }
-    if ((r.status === 409 || r.status === 422) && attempt < 4) continue; // someone else wrote first: refetch & reapply
-    throw new HttpError(r, r.status === 403 || r.status === 404 ? 'Token needs Contents: Read and write on this repo' : null);
+    const { list: remote, ver, empty } = await IO[t].read();
+    const ops = (outbox[t] || []).slice();
+    const tMap = new Map(applyOps(remote, ops).map(e => [e.id, e])); // deliver this phone's changes
+    const lMap = new Map(local.map(e => [e.id, e]));
+    const pendIds = new Set(), pendDel = new Set();
+    for (const k in outbox) for (const o of outbox[k]) { const id = o.op === 'add' ? o.e.id : o.id; pendIds.add(id); if (o.op === 'del') pendDel.add(id); }
+    let writeT = ops.length > 0 || empty, gotNew = false;
+    for (const [id, e] of lMap) if (!tMap.has(id)) { tMap.set(id, e); writeT = true; } // that place is missing something: copy it there
+    for (const [id, e] of tMap) {
+      const l = lMap.get(id);
+      if (!l) { if (pendDel.has(id)) { tMap.delete(id); writeT = true; } else { lMap.set(id, e); gotNew = true; } } // new from elsewhere
+      else if (!same(l, e)) { if (pendIds.has(id)) { tMap.set(id, l); writeT = true; } else { lMap.set(id, e); gotNew = true; } } // edited elsewhere
+    }
+    if (writeT && !(await IO[t].write(byTs(tMap), ver, ops))) {
+      if (attempt < 4) continue;
+      throw new Error('Another phone was saving at the same moment. It will try again.');
+    }
+    outbox[t] = (outbox[t] || []).slice(ops.length);
+    if (gotNew) local = byTs(lMap);
+    return gotNew;
   }
 }
+
+let syncing = false, again = false, syncTimer = 0, branchOk = false;
+function scheduleSync(ms = 1200) { clearTimeout(syncTimer); syncTimer = setTimeout(sync, ms); }
 async function sync() {
-  if (!backend()) return setStatus();
+  const ts = targets();
+  if (!ts.length) { setStatus(); renderBanner(); return; }
   if (syncing) { again = true; return; }
   syncing = true; setStatus('busy');
-  try {
-    await (backend() === 'file' ? syncFile() : syncGithub());
-    save(K.snap, snapshot); save(K.pend, pending); lastErr = '';
-    render();
-  } catch (e) {
-    lastErr = backend() === 'github' && navigator.onLine === false ? 'Offline: will sync later' : (e.message || 'Could not save');
-    branchOk = false;
-  } finally {
-    syncing = false; setStatus();
-    if (again) { again = false; scheduleSync(300); }
+  let gotNew = false;
+  for (const t of ts) {
+    if (t === 'file' && !fileHandle) continue; // link still loading, or lost (reported at startup)
+    try {
+      if (await syncTarget(t)) gotNew = true;
+      tstat[t] = { ok: Date.now(), err: '' };
+    } catch (e) {
+      const prev = tstat[t] || {};
+      const err = e instanceof PermError ? 'perm' : t === 'github' && navigator.onLine === false ? 'No internet right now. It will save when the phone is back online.' : (e.message || 'Could not save');
+      tstat[t] = { ...prev, err, errAt: prev.err ? prev.errAt : Date.now() };
+      if (t === 'github') branchOk = false;
+    }
   }
+  save(K.snap, local); save(K.out, outbox); save(K.tstat, tstat);
+  syncing = false;
+  if (gotNew) { render(); if (ts.length > 1) again = true; } // copy what came in to the other places too
+  setStatus(); renderBanner(); refreshPlaces();
+  if (again) { again = false; scheduleSync(300); }
 }
+const waiting = t => (outbox[t] || []).length;
 function setStatus(s) {
-  const btn = $('#syncBtn'), t = $('#syncText');
-  if (!s) s = !backend() ? 'local' : fileHandle && filePerm !== 'granted' ? 'perm' : lastErr ? 'err' : pending.length ? 'pending' : 'ok';
+  const btn = $('#syncBtn'), txt = $('#syncText'), ts = targets(), errs = ts.filter(t => tstat[t]?.err);
+  const n = Math.max(0, ...ts.map(waiting));
+  if (!s) s = !ts.length ? 'local' : errs.some(t => tstat[t].err === 'perm') ? 'perm' : errs.length ? 'err' : n ? 'pending' : 'ok';
   btn.dataset.s = s;
-  t.textContent = { local: 'Phone only', busy: 'Saving…', pending: `${pending.length} to save`, err: 'Not saved', perm: 'Tap to reconnect', ok: fileHandle ? 'Saved to file' : 'Saved' }[s];
-  btn.title = lastErr || '';
+  txt.textContent = { local: 'Only on phone', busy: 'Saving…', pending: `${n} to save`, perm: 'Tap to allow',
+    err: errs.length === ts.length ? 'Not backed up' : 'Partly saved', ok: `Saved in ${1 + ts.length} places` }[s];
+  btn.title = errs.map(t => `${PLACE[t]()}: ${tstat[t].err === 'perm' ? 'needs permission again' : tstat[t].err}`).join('\n');
+}
+
+/* ---------- automatic backups inside the app (IndexedDB): one per day for 30 days ---------- */
+let bkTimer = 0;
+function scheduleBackup() { clearTimeout(bkTimer); bkTimer = setTimeout(() => backupNow(), 3000); }
+async function backupNow(label) {
+  if (!local.length && !label) return; // never let an empty log replace a day's backup
+  try {
+    await idb.set('bk:' + (label || dayKey(Date.now())), { at: Date.now(), list: local });
+    const keys = (await idb.keys()).map(String).filter(k => k.startsWith('bk:')).sort();
+    const daily = keys.filter(k => /^bk:\d{4}-/.test(k)), other = keys.filter(k => !/^bk:\d{4}-/.test(k));
+    for (const k of [...daily.slice(0, -30), ...other.slice(0, -10)]) await idb.del(k);
+  } catch {}
+}
+async function listBackups() {
+  try {
+    const keys = (await idb.keys()).map(String).filter(k => k.startsWith('bk:')), out = [];
+    for (const k of keys) { const v = await idb.get(k); if (v && v.list) out.push({ k, at: v.at, list: v.list }); }
+    return out.sort((a, b) => b.at - a.at);
+  } catch { return []; }
 }
 
 /* ---------- helpers ---------- */
@@ -434,7 +517,7 @@ function chartDaily(days) {
       const c = d[m], my = BOT + 26 + j * 13;
       if (c) s += mark(m, cx, my, Math.min(4.5, bw / 2.2)) + (c > 1 && bw >= 10 ? `<text x="${cx}" y="${my+3}" text-anchor="middle" style="fill:${m === 'vomit' ? '#1a1a19' : '#fff'};font-size:7px;font-weight:700">${c}</text>` : '');
     });
-    const tip = `${new Date(d.ts).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}\n${d.poops} poop${d.poops === 1 ? '' : 's'}${isFinite(d.type) ? ` · avg type ${d.type.toFixed(1)}` : ''}${d.vomit ? `\nVomit ${d.vomit}` : ''}\nMiraLAX ${d.miralax} · Gas-X ${d.gasx}`;
+    const tip = `${new Date(d.ts).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}\n${d.poops} poop${d.poops === 1 ? '' : 's'}${isFinite(d.type) ? ` · avg type ${d.type.toFixed(1)}` : ''}${d.vomit ? `\nVomit ${d.vomit}` : ''}\nImodium ${d.imodium} · Gas-X ${d.gasx}`;
     s += `<rect x="${x}" y="${T}" width="${bw}" height="${BOT + 22 + MED - T}" fill="transparent" data-tip="${esc(tip)}"/>`;
   });
   s += `<line x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--border)"/>`;
@@ -525,7 +608,7 @@ function weeks(list) {
     const inW = list.filter(x => x.ts >= s && x.ts < e), poops = inW.filter(x => x.ev === 'poop');
     const days = Math.max(1, (Math.min(e, now) - Math.max(s, startOfDay(list[0].ts))) / DAY);
     out.push({ s, perDay: poops.length / days, type: mean(poops.filter(p => p.b).map(p => p.b)),
-      mira: inW.filter(x => x.ev === 'miralax').length / days, gasx: inW.filter(x => x.ev === 'gasx').length / days, vomit: inW.filter(x => x.ev === 'vomit').length });
+      imod: inW.filter(x => x.ev === 'imodium').length / days, gasx: inW.filter(x => x.ev === 'gasx').length / days, vomit: inW.filter(x => x.ev === 'vomit').length });
   }
   return out;
 }
@@ -535,7 +618,7 @@ function vomitStats(list, from, to, effDays) {
   const v = list.filter(e => e.ev === 'vomit' && e.ts >= from && e.ts <= to);
   const near = (ev, d, before, after) => list.some(e => e.ev === ev && e.ts >= d.ts - before && e.ts <= d.ts + after && e !== d);
   const r = { n: v.length, perWeek: v.length / effDays * 7, last: v.length ? v[v.length - 1].ts : NaN,
-    afterMira: v.filter(d => near('miralax', d, 6 * HOUR, 0)).length,
+    afterImod: v.filter(d => near('imodium', d, 6 * HOUR, 0)).length,
     afterGasx: v.filter(d => near('gasx', d, 6 * HOUR, 0)).length,
     nearPoop: v.filter(d => near('poop', d, 2 * HOUR, 2 * HOUR)).length,
     days: new Set(v.map(d => dayKey(d.ts))).size };
@@ -544,7 +627,7 @@ function vomitStats(list, from, to, effDays) {
 function vomitInsights(vs) {
   const out = []; if (!vs.n) return out;
   out.push(['🤢', `Vomited ${vs.n} time${vs.n === 1 ? '' : 's'} on ${vs.days} day${vs.days === 1 ? '' : 's'} in this period (${vs.perWeek.toFixed(1)} a week).`]);
-  for (const [k, lab] of [['afterMira', 'MiraLAX'], ['afterGasx', 'Gas-X']])
+  for (const [k, lab] of [['afterImod', 'Imodium'], ['afterGasx', 'Gas-X']])
     if (vs.n >= 2 && vs[k] / vs.n >= .5) out.push(['🔍', `${vs[k]} of ${vs.n} vomiting episodes came within 6h after taking ${lab}.`]);
   return out;
 }
@@ -563,17 +646,17 @@ function insights(list, from, to, cur, timing) {
     const t = timing[m]; if (t.n < 2) continue;
     const top = Object.entries(t.cat).sort((a, b) => b[1] - a[1])[0];
     const words = { before: 'within 3h before a poop', during: 'around the same time as a poop', after: 'within 3h after a poop', apart: 'more than 3h away from any poop' };
-    out.push([m === 'miralax' ? '💧' : '🫧', `${EV[m].label} is most often taken ${words[top[0]]} (${Math.round(top[1] / t.n * 100)}% of ${t.n} doses).`]);
+    out.push([EMOJI[m], `${EV[m].label} is most often taken ${words[top[0]]} (${Math.round(top[1] / t.n * 100)}% of ${t.n} doses).`]);
     if (t.toNext.length >= 3) out.push(['⏱️', `After ${EV[m].label}, the next poop typically comes ${fmtDur(median(t.toNext))} later.`]);
   }
-  const mx = timing.miralax, typed = poops.filter(p => p.b);
+  const mx = timing.imodium, typed = poops.filter(p => p.b);
   if (mx.afterTypes.length >= 3) {
-    const doses = list.filter(e => e.ev === 'miralax');
+    const doses = list.filter(e => e.ev === 'imodium');
     const other = typed.filter(p => !doses.some(d => p.ts > d.ts && p.ts - d.ts <= 24 * HOUR)).map(p => p.b);
     if (other.length >= 3) {
       const a = mean(mx.afterTypes), b = mean(other), diff = a - b;
-      out.push(['🔍', Math.abs(diff) < .4 ? `Stool type looks about the same in the 24h after MiraLAX (${a.toFixed(1)}) as at other times (${b.toFixed(1)}).`
-        : `Stools are ${diff > 0 ? 'softer' : 'firmer'} in the 24h after MiraLAX: avg type ${a.toFixed(1)} vs ${b.toFixed(1)} otherwise.`]);
+      out.push(['🔍', Math.abs(diff) < .4 ? `Stool type looks about the same in the 24h after Imodium (${a.toFixed(1)}) as at other times (${b.toFixed(1)}).`
+        : `Stools are ${diff > 0 ? 'softer' : 'firmer'} in the 24h after Imodium: avg type ${a.toFixed(1)} vs ${b.toFixed(1)} otherwise.`]);
     }
   }
   if (cur.gaps.length) {
@@ -592,7 +675,7 @@ function renderTrends(list) {
   const days = Array.from({ length: nDays }, (_, i) => {
     const s = addDays(from, i), e = addDays(s, 1), d = inR.filter(x => x.ts >= s && x.ts < e);
     const p = d.filter(x => x.ev === 'poop');
-    return { ts: s, poops: p.length, type: mean(p.filter(x => x.b).map(x => x.b)), vomit: d.filter(x => x.ev === 'vomit').length, miralax: d.filter(x => x.ev === 'miralax').length, gasx: d.filter(x => x.ev === 'gasx').length };
+    return { ts: s, poops: p.length, type: mean(p.filter(x => x.b).map(x => x.b)), vomit: d.filter(x => x.ev === 'vomit').length, imodium: d.filter(x => x.ev === 'imodium').length, gasx: d.filter(x => x.ev === 'gasx').length };
   });
   const effDays = Math.max(1, (to - Math.max(from, startOfDay(list[0].ts))) / DAY);
   const gaps = []; for (let i = 1; i < poops.length; i++) gaps.push(poops[i].ts - poops[i-1].ts);
@@ -608,12 +691,12 @@ function renderTrends(list) {
 
   <div class="card"><h3>Poops per day</h3><p class="sub">Bars are poops. Marks underneath are vomiting (◆) and medicine doses (●) that day.</p>
     ${chartDaily(days)}
-    <div class="legend"><span><i style="background:var(--poop)"></i>Poops</span><span><i class="dia" style="background:var(--vomit)"></i>Vomit (V)</span><span><i class="dot" style="background:var(--mira)"></i>MiraLAX (Mx)</span><span><i class="dot" style="background:var(--gasx)"></i>Gas-X (Gx)</span></div>
+    <div class="legend"><span><i style="background:var(--poop)"></i>Poops</span><span><i class="dia" style="background:var(--vomit)"></i>Vomit (V)</span><span><i class="dot" style="background:var(--imod)"></i>Imodium (Im)</span><span><i class="dot" style="background:var(--gasx)"></i>Gas-X (Gx)</span></div>
   </div>
 
   <div class="card"><h3>Stool type over time</h3><p class="sub">Each dot is one poop. The line is the average of the last 5.</p>
     ${chartTypeOverTime(list, from, to)}
-    <div class="legend"><span><i class="dot" style="background:${BCOL[1]}"></i>Hard</span><span><i class="dot" style="background:${BCOL[4]}"></i>Ideal</span><span><i class="dot" style="background:${BCOL[7]}"></i>Loose</span><span><i class="dia" style="background:var(--vomit)"></i>Vomit</span><span><i class="tri" style="--c:var(--mira)"></i>MiraLAX</span><span><i class="tri" style="--c:var(--gasx)"></i>Gas-X</span></div>
+    <div class="legend"><span><i class="dot" style="background:${BCOL[1]}"></i>Hard</span><span><i class="dot" style="background:${BCOL[4]}"></i>Ideal</span><span><i class="dot" style="background:${BCOL[7]}"></i>Loose</span><span><i class="dia" style="background:var(--vomit)"></i>Vomit</span><span><i class="tri" style="--c:var(--imod)"></i>Imodium</span><span><i class="tri" style="--c:var(--gasx)"></i>Gas-X</span></div>
   </div>
 
   <div class="card"><h3>Type mix</h3><p class="sub">${poops.filter(p => p.b).length} poops with a recorded type</p>${chartMix(poops)}</div>
@@ -625,7 +708,7 @@ function renderTrends(list) {
       <div class="stat"><b>${vs.days}</b><span>day${vs.days === 1 ? '' : 's'} with vomiting</span></div>
       <div class="stat"><b>${ago(vs.last).replace(' ago', '')}</b><span>since the last time</span></div></div>
     <div class="timing">
-      ${[['afterMira', 'After MiraLAX'], ['afterGasx', 'After Gas-X'], ['nearPoop', 'Near a poop']].map(([k, l]) =>
+      ${[['afterImod', 'After Imodium'], ['afterGasx', 'After Gas-X'], ['nearPoop', 'Near a poop']].map(([k, l]) =>
         `<div class="tbar"><span>${l}</span><span class="track"><span class="fill" style="display:block;width:${pct(vs[k], vs.n)}%"></span></span><span class="pct">${pct(vs[k], vs.n)}%</span></div>`).join('')}
       <p class="sub" style="margin:6px 0 0">“After” means the medicine was taken in the 6 hours before vomiting. “Near a poop” means within 2 hours either side.</p></div>`
     : `<p class="sub" style="margin:0">None logged in this period.</p>`}
@@ -643,15 +726,15 @@ function renderTrends(list) {
 
   <div class="card"><h3>Time of day</h3>${chartHours(poops)}</div>
 
-  ${wk.length ? `<div class="card"><h3>Weekly averages</h3><table class="weeks"><thead><tr><th>Week of</th><th>Poops/d</th><th>Type</th><th>Mira/d</th><th>Gas-X/d</th><th>Vomit</th></tr></thead><tbody>
-    ${wk.map(w => `<tr><td>${new Date(w.s).toLocaleDateString([], { month: 'short', day: 'numeric' })}</td><td>${w.perDay.toFixed(1)}</td><td>${isFinite(w.type) ? w.type.toFixed(1) : '–'}</td><td>${w.mira.toFixed(1)}</td><td>${w.gasx.toFixed(1)}</td><td>${w.vomit || '–'}</td></tr>`).join('')}
+  ${wk.length ? `<div class="card"><h3>Weekly averages</h3><table class="weeks"><thead><tr><th>Week of</th><th>Poops/d</th><th>Type</th><th>Imod/d</th><th>Gas-X/d</th><th>Vomit</th></tr></thead><tbody>
+    ${wk.map(w => `<tr><td>${new Date(w.s).toLocaleDateString([], { month: 'short', day: 'numeric' })}</td><td>${w.perDay.toFixed(1)}</td><td>${isFinite(w.type) ? w.type.toFixed(1) : '–'}</td><td>${w.imod.toFixed(1)}</td><td>${w.gasx.toFixed(1)}</td><td>${w.vomit || '–'}</td></tr>`).join('')}
   </tbody></table></div>` : ''}`;
 }
 
 /* ---------- render all ---------- */
 function render() {
   const list = entries();
-  renderKpis(list); renderRecent(list);
+  renderKpis(list); renderRecent(list); renderBanner();
   if (ui.tab === 'history') renderHistory(list);
   if (ui.tab === 'trends') renderTrends(list);
   setStatus();
@@ -674,7 +757,7 @@ function toast(msg, undo = null, ms = 5000) {
 }
 const delOne = e => { queue({ op: 'del', id: e.id }); toast('Entry deleted', () => queue({ op: 'add', e })); };
 function log(ev, b = null, ts = Date.now()) {
-  const e = { id: newId(), ts, ev, b };
+  const e = { id: newId(), ts: Math.floor(ts / 1000) * 1000, ev, b };
   queue({ op: 'add', e }); buzz();
   const btn = $(`.act[data-act="${ev}"]`); btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop');
   toast(ev === 'poop' ? `💩 Type ${b} logged${ts < Date.now() - MIN ? ` at ${fmtTime(ts)}` : ''}` : `${EMOJI[ev]} ${EV[ev].label} logged at ${fmtTime(ts)}`, () => queue({ op: 'del', id: e.id }));
@@ -750,6 +833,40 @@ document.addEventListener('click', e => {
 });
 addEventListener('scroll', () => tip.hidden = true, { passive: true });
 
+/* ---------- where it's saved: places list + home-screen warning ---------- */
+function placeLine(t) {
+  const st = tstat[t] || {};
+  if (st.err === 'perm') return 'Needs permission again';
+  if (st.err) return esc(st.err);
+  if (waiting(t)) return `${waiting(t)} change${waiting(t) === 1 ? '' : 's'} waiting to save`;
+  return st.ok ? `Last saved ${ago(st.ok)}` : 'Not saved yet';
+}
+function placesHTML() {
+  const row = (state, title, sub) => `<li class="place is-${state}"><span class="pi" aria-hidden="true">${state === 'ok' ? '✓' : state === 'warn' ? '!' : '+'}</span><span><b>${title}</b><small>${sub}</small></span></li>`;
+  const lc = load(K.copy, 0);
+  let h = row('ok', 'Inside this app', `${local.length} entries · a backup is kept each day for 30 days`);
+  h += cfg.fileName ? row(tstat.file?.err ? 'warn' : 'ok', `File: ${esc(cfg.fileName)}`, placeLine('file'))
+                    : row('off', FS_OK ? 'A file on this phone' : 'Copies in Files', FS_OK ? 'Not set up' : (lc ? `Last copy saved ${ago(lc)}` : 'No copy saved yet'));
+  h += connected() ? row(tstat.github?.err ? 'warn' : 'ok', `GitHub: ${esc(cfg.repo)}`, placeLine('github')) : row('off', 'Online backup (GitHub)', 'Not set up');
+  const n = 1 + targets().length;
+  return `<ul class="places">${h}</ul><p class="places-sum ${n > 1 ? 'good' : 'bad'}">${n > 2 ? `✓ Saved in ${n} places. Very safe.` : n > 1 ? '✓ Saved in 2 places.' : '⚠ Only saved inside this app. Add a backup so the log can never be lost.'}</p>`;
+}
+function refreshPlaces() { $$('.places-box').forEach(el => el.innerHTML = placesHTML()); }
+function renderBanner() {
+  const el = $('#banner'); if (!el) return;
+  const ts = targets(); let html = '';
+  if (!ts.length) {
+    const lc = load(K.copy, 0);
+    html = `<span><b>⚠ Only saved inside this app.</b> If the phone is lost or the browser is cleared, the log is gone.${lc ? ` Last copy saved ${ago(lc)}.` : ''}</span><button type="button" data-b="wizard">Set up a backup</button>`;
+  } else if (ts.some(t => tstat[t]?.err === 'perm')) {
+    html = `<span><b>The file needs permission again.</b> New entries are waiting to be saved to ${esc(cfg.fileName)}.</span><button type="button" data-b="allow">Allow</button>`;
+  } else {
+    const bad = ts.filter(t => tstat[t]?.err && Date.now() - (tstat[t].errAt || 0) > HOUR);
+    if (bad.length) html = `<span><b>⚠ Couldn't save to ${bad.map(t => esc(PLACE[t]())).join(' or ')} for ${fmtDur(Date.now() - tstat[bad[0]].errAt)}.</b> ${esc(tstat[bad[0]].err)}</span><button type="button" data-b="settings">Fix</button>`;
+  }
+  el.innerHTML = html; el.hidden = !html;
+}
+
 /* ---------- wire up ---------- */
 function init() {
   $$('[data-icon]').forEach(el => el.innerHTML = ICON[el.dataset.icon]);
@@ -794,97 +911,184 @@ function init() {
     queue({ op: 'edit', id: editing.id, patch }); toast('Saved');
   };
 
-  // settings
-  const fill = () => { $('#sOwner').value = cfg.owner; $('#sRepo').value = cfg.repo; $('#sBranch').value = cfg.branch; $('#sPath').value = cfg.path; $('#sToken').value = cfg.token; };
+  // ---------- settings ----------
+  const note = (t, c = '') => { const m = $('#setNote'); m.textContent = t; m.className = 'set-msg ' + c; };
   const msg = (t, c = '') => { const m = $('#setMsg'); m.textContent = t; m.className = 'set-msg ' + c; };
-  // reset: deletes every entry everywhere it is saved (as delete ops, so file/GitHub stay in step), with a 10s undo
+  const dmsg = (t, c = '') => { const m = $('#devMsg'); m.textContent = t; m.className = 'set-msg ' + c; };
+  $('#settingsBtn').onclick = () => { note(''); refreshPlaces(); $('#setDlg').showModal(); };
+  $('#openWizard').onclick = () => openWizard(0);
+  const allowFile = async () => { // must run straight from a tap
+    if (!fileHandle) return openWizard(1);
+    try { filePerm = await permOf(fileHandle, true); } catch {}
+    if (filePerm === 'granted') { tstat.file = { ...(tstat.file || {}), err: '' }; sync(); }
+  };
+  $('#syncBtn').onclick = () => {
+    const s = $('#syncBtn').dataset.s;
+    if (s === 'perm') return allowFile();
+    if (s === 'local') return openWizard(0);
+    if (s === 'err') { refreshPlaces(); $('#setDlg').showModal(); }
+    sync();
+  };
+  $('#banner').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.b === 'allow') allowFile();
+    else if (b.dataset.b === 'wizard') openWizard(0);
+    else { refreshPlaces(); $('#setDlg').showModal(); }
+  };
+
+  // reset: deletes every entry everywhere it is saved, keeps a backup inside the app, and offers 10s of undo
   $('#resetOpen').onclick = () => {
-    const all = entries(); if (!all.length) return msg('There is nothing to delete.');
+    const all = entries(); if (!all.length) return note('There is nothing to delete.');
     const n = ev => all.filter(e => e.ev === ev).length;
-    const where = backend() === 'file' ? ` and from <b>${esc(fileHandle.name)}</b>` : backend() === 'github' ? ` and from <b>${esc(cfg.repo)}/${esc(cfg.path)}</b> on GitHub` : '';
-    $('#resetText').innerHTML = `This permanently deletes all <b>${all.length}</b> entries (${n('poop')} poop, ${n('vomit')} vomit, ${n('miralax')} MiraLAX, ${n('gasx')} Gas-X) from this phone${where}. Settings are kept.`;
+    const places = ['this phone', ...targets().map(t => t === 'file' ? `<b>${esc(cfg.fileName)}</b>` : `<b>${esc(cfg.repo)}</b> on GitHub`)];
+    $('#resetText').innerHTML = `This deletes all <b>${all.length}</b> entries (${n('poop')} poop, ${n('vomit')} vomit, ${n('imodium')} Imodium, ${n('gasx')} Gas-X) from ${places.join(' and ')}. Settings are kept.`;
     $('#resetDlg').showModal();
   };
-  $('#resetBackup').onclick = async () => { try { download(`gut-check-backup-${dayKey(Date.now())}.xlsx`, await xlsxBlob(entries())); } catch { download(`gut-check-backup-${dayKey(Date.now())}.csv`, new Blob([toCSV(entries())], { type: 'text/csv' })); } };
-  $('#resetGo').onclick = () => {
+  $('#resetBackup').onclick = async () => { try { download(`gut-check-backup-${dayKey(Date.now())}.xlsx`, await xlsxBlob(entries())); } catch { download(`gut-check-backup-${dayKey(Date.now())}.csv`, new Blob([toCSV(entries())], { type: 'text/csv' })); } save(K.copy, Date.now()); };
+  $('#resetGo').onclick = async () => {
     const all = entries();
+    await backupNow(`reset-${Date.now()}`); // can be restored later from the setup wizard
     queue(...all.map(e => ({ op: 'del', id: e.id })));
     $('#resetDlg').close(); $('#setDlg').close(); setTab('home');
     toast(`🧹 Deleted all ${all.length} entries`, () => queue(...all.map(e => ({ op: 'add', e }))), 10000);
   };
-  const dmsg = (t, c = '') => { const m = $('#devMsg'); m.textContent = t; m.className = 'set-msg ' + c; };
-  const fillDev = () => {
-    $('#devYes').hidden = !FS_OK; $('#devNo').hidden = FS_OK; $('#devUnlink').hidden = !fileHandle;
-    $('#devState').innerHTML = fileHandle ? `Saving to <b>${esc(fileHandle.name)}</b>${filePerm !== 'granted' ? ' (needs permission again)' : ''}` : 'No file linked yet.';
+
+  // files
+  const copySaved = () => { save(K.copy, Date.now()); renderBanner(); refreshPlaces(); };
+  $('#expCsv').onclick = () => { download(`gut-check-${dayKey(Date.now())}.csv`, new Blob(['﻿' + toCSV(entries())], { type: 'text/csv' })); copySaved(); };
+  $('#expXlsx').onclick = async () => {
+    try { download(`gut-check-${dayKey(Date.now())}.xlsx`, await xlsxBlob(entries())); copySaved(); } catch (e) { note(e.message, 'err'); }
   };
-  $('#settingsBtn').onclick = () => { fill(); fillDev(); msg(backend() === 'github' ? lastErr : '', 'err'); dmsg(backend() === 'file' ? lastErr : '', 'err'); $('#setDlg').showModal(); };
-  $('#syncBtn').onclick = async () => {
-    if (fileHandle && filePerm !== 'granted') { try { filePerm = await permOf(fileHandle, true); } catch {} } // needs this tap
-    backend() ? sync() : $('#settingsBtn').click();
+  const onImport = (out) => async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try { const r = await importFile(f); out(`Read ${r.found} rows from ${f.name}. Added ${r.added} new; the rest were already here.`, 'ok'); }
+    catch (err) { out(err.message || 'Could not read that file', 'err'); }
   };
+  $('#impFile').onchange = onImport(note);
+
+  // ---------- setup wizard ----------
+  const WZ = $$('.wz-step').length;
+  let wzStep = 0;
+  function showStep(n) {
+    wzStep = n;
+    $$('.wz-step').forEach((el, i) => el.hidden = i !== n);
+    $('#wzBack').hidden = n === 0;
+    $('#wzNext').textContent = n === 0 ? 'Start' : n === WZ - 1 ? 'Done' : 'Next';
+    $('#wzDots').innerHTML = Array.from({ length: WZ }, (_, i) => `<i class="${i === n ? 'on' : ''}"></i>`).join('');
+    if (n === 3) renderBackups();
+    refreshPlaces(); fillDev(); fillGh();
+    $('#wizDlg .dlg').scrollTop = 0;
+  }
+  function openWizard(n) { $('#setDlg').open && $('#setDlg').close(); msg(''); dmsg(''); $('#wzImpMsg').textContent = ''; showStep(n); $('#wizDlg').showModal(); }
+  $('#wzNext').onclick = () => wzStep === WZ - 1 ? $('#wizDlg').close() : showStep(wzStep + 1);
+  $('#wzBack').onclick = () => showStep(wzStep - 1);
+  $('#wzClose').onclick = () => $('#wizDlg').close();
+
+  // step 1: a file on this phone
+  function fillDev() {
+    $('#devYes').hidden = !FS_OK; $('#devNo').hidden = FS_OK; $('#devUnlink').hidden = !cfg.fileName;
+    $('#devNew').textContent = cfg.fileName ? 'Switch to a new file…' : 'Create new file…';
+    $('#devState').innerHTML = cfg.fileName ? `✓ Saving to <b>${esc(cfg.fileName)}</b>${tstat.file?.err === 'perm' ? ' (needs permission again: tap “Allow” on the home screen)' : ''}` : 'No file linked yet.';
+    const lc = load(K.copy, 0);
+    $('#lastCopy').textContent = lc ? `Last copy saved ${ago(lc)}.` : 'No copy saved yet.';
+  }
   const linkFile = async create => {
     const types = [{ description: 'Spreadsheet', accept: { 'text/csv': ['.csv'], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } }];
     try {
-      const h = create ? await window.showSaveFilePicker({ suggestedName: 'gut-check.csv', types })
+      const h = create ? await window.showSaveFilePicker({ suggestedName: 'gut-check.xlsx', types })
                        : (await window.showOpenFilePicker({ types, multiple: false }))[0];
       if (await permOf(h, true) !== 'granted') return dmsg('The app needs permission to edit that file.', 'err');
-      carryOver(); fileHandle = h; filePerm = 'granted'; lastErr = '';
+      fileHandle = h; filePerm = 'granted'; cfg.fileName = h.name; save(K.cfg, cfg);
+      outbox.file = []; tstat.file = {}; save(K.out, outbox);
       try { await idb.set('file', h); } catch {}
       dmsg('Saving…'); await sync(); fillDev();
-      lastErr ? dmsg(lastErr, 'err') : dmsg(`Linked · ${entries().length} entries in ${h.name}`, 'ok');
+      tstat.file?.err ? dmsg(tstat.file.err === 'perm' ? 'The app needs permission to edit that file.' : tstat.file.err, 'err')
+                      : dmsg(`Done. All ${local.length} entries are in ${h.name}, and every new tap is saved there too.`, 'ok');
     } catch (e) { if (e.name !== 'AbortError') dmsg(e.message || 'Could not use that file', 'err'); }
   };
   $('#devNew').onclick = () => linkFile(true);
   $('#devOpen').onclick = () => linkFile(false);
   $('#devUnlink').onclick = async () => {
-    const wasFile = !!fileHandle;
-    snapshot = entries(); pending = []; save(K.snap, snapshot); save(K.pend, pending);
-    fileHandle = null; filePerm = 'granted'; lastErr = ''; try { await idb.del('file'); } catch {}
-    if (wasFile && connected()) { carryOver(); scheduleSync(100); }
-    fillDev(); dmsg('Unlinked. The file is untouched, and entries stay in the app.'); render();
+    fileHandle = null; filePerm = 'granted'; cfg.fileName = ''; save(K.cfg, cfg);
+    delete outbox.file; delete tstat.file; save(K.out, outbox); save(K.tstat, tstat);
+    try { await idb.del('file'); } catch {}
+    fillDev(); refreshPlaces(); setStatus(); renderBanner(); dmsg('Unlinked. The file is untouched, and every entry is still in the app.');
   };
   $('#devShare').onclick = async () => {
-    const name = `gut-check-${dayKey(Date.now())}.csv`, file = new File([toCSV(entries())], name, { type: 'text/csv' });
+    const name = `gut-check-${dayKey(Date.now())}.csv`, file = new File(['﻿' + toCSV(entries())], name, { type: 'text/csv' });
     try {
-      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); dmsg('Saved a copy.', 'ok'); }
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); }
       else download(name, file);
+      copySaved(); fillDev(); dmsg('Copy saved.', 'ok');
     } catch (e) { if (e.name !== 'AbortError') dmsg(e.message, 'err'); }
   };
+
+  // step 2: GitHub
+  function ghLinks() {
+    const owner = $('#sOwner').value.trim(), repo = $('#sRepo').value.trim() || 'gut-check-data';
+    $('#ghRepoLink').href = `https://github.com/new?name=${encodeURIComponent(repo)}&visibility=private&description=${encodeURIComponent('Gut Check log (private)')}`;
+    $('#ghTokenLink').href = `https://github.com/settings/personal-access-tokens/new?name=${encodeURIComponent('Gut Check')}&description=${encodeURIComponent('Lets the Gut Check app save the log to ' + repo)}${owner ? `&target_name=${encodeURIComponent(owner)}` : ''}&contents=write`;
+    $$('.repo-name').forEach(el => el.textContent = repo);
+  }
+  function fillGh() {
+    if (document.activeElement && document.activeElement.closest('#wzGh')) return; // don't clobber typing
+    $('#sOwner').value = cfg.owner; $('#sRepo').value = cfg.repo; $('#sBranch').value = cfg.branch; $('#sPath').value = cfg.path; $('#sToken').value = cfg.token;
+    $('#ghState').innerHTML = connected() ? `✓ Backing up to <b>${esc(cfg.owner)}/${esc(cfg.repo)}</b>` : '';
+    $('#setDisconnect').hidden = !connected();
+    ghLinks();
+  }
+  ['#sOwner', '#sRepo'].forEach(id => $(id).addEventListener('input', ghLinks));
   $('#setSave').onclick = async () => {
-    const wasLocal = backend() !== 'github';
-    cfg = { owner: $('#sOwner').value.trim(), repo: $('#sRepo').value.trim(), branch: $('#sBranch').value.trim(),
-      path: $('#sPath').value.trim().replace(/^\/+/, '') || 'gut-check.csv', token: $('#sToken').value.trim() };
+    const was = connected();
+    Object.assign(cfg, { owner: $('#sOwner').value.trim().replace(/^@/, ''), repo: $('#sRepo').value.trim(), branch: $('#sBranch').value.trim(),
+      path: $('#sPath').value.trim().replace(/^\/+/, '') || 'gut-check.csv', token: $('#sToken').value.trim() });
     save(K.cfg, cfg); branchOk = false;
-    if (!connected()) return msg('Fill in owner, repository and token.', 'err');
-    // GitHub replaces a linked phone file; everything logged so far gets uploaded too
-    if (fileHandle) { fileHandle = null; try { await idb.del('file'); } catch {} }
-    if (wasLocal) carryOver();
-    msg('Connecting…'); await sync();
-    lastErr ? msg(lastErr, 'err') : msg(`Connected · ${entries().length} entries`, 'ok');
+    if (!connected()) return msg('Fill in your GitHub username, the repository name and the access key.', 'err');
+    if (!was) outbox.github = [];
+    tstat.github = {}; save(K.out, outbox);
+    msg('Connecting…'); await sync(); fillGh();
+    tstat.github?.err ? msg(tstat.github.err, 'err') : msg(`Connected. All ${local.length} entries are backed up on GitHub, and every new tap is too.`, 'ok');
   };
   $('#setDisconnect').onclick = () => {
-    snapshot = entries(); pending = []; save(K.snap, snapshot); save(K.pend, pending);
-    cfg.token = ''; save(K.cfg, cfg); lastErr = ''; fill(); msg('Disconnected. Entries stay on this phone.'); render();
+    cfg.token = ''; save(K.cfg, cfg); delete outbox.github; delete tstat.github; save(K.out, outbox); save(K.tstat, tstat);
+    fillGh(); refreshPlaces(); setStatus(); renderBanner(); msg('Disconnected. Nothing was deleted on GitHub, and every entry is still in the app.');
   };
-  $('#expCsv').onclick = () => download(`gut-check-${dayKey(Date.now())}.csv`, new Blob(['﻿' + toCSV(entries())], { type: 'text/csv' }));
-  $('#expXlsx').onclick = async () => {
-    try { download(`gut-check-${dayKey(Date.now())}.xlsx`, await xlsxBlob(entries())); } catch (e) { msg(e.message, 'err'); }
-  };
-  $('#impFile').onchange = async e => {
-    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-    try { const r = await importFile(f); msg(`Read ${r.found} rows, added ${r.added} new.`, 'ok'); }
-    catch (err) { msg(err.message || 'Could not read that file', 'err'); }
+
+  // step 3: bring in data
+  $('#wzImp').onchange = onImport((t, c) => { const m = $('#wzImpMsg'); m.textContent = t; m.className = 'set-msg ' + c; renderBackups(); });
+  async function renderBackups() {
+    const items = await listBackups();
+    $('#bkList').innerHTML = items.length ? items.map(i => `<div class="bk"><span><b>${i.k.startsWith('bk:reset') ? 'Before “Delete all”' : fmtDay(i.at)}</b>
+      <small>${new Date(i.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · ${i.list.length} entries</small></span>
+      <button type="button" class="ghost" data-restore="${esc(i.k)}">Restore</button></div>`).join('')
+      : '<p class="hint">No automatic backups yet. One is made each day the app is used.</p>';
+  }
+  $('#bkList').onclick = async e => {
+    const b = e.target.closest('[data-restore]'); if (!b) return;
+    const v = (await listBackups()).find(i => i.k === b.dataset.restore); if (!v) return;
+    const have = new Set(local.map(x => x.id)), add = v.list.map(fixEv).filter(x => !have.has(x.id));
+    if (add.length) queue(...add.map(x => ({ op: 'add', e: x })));
+    const m = $('#wzImpMsg'); m.className = 'set-msg ok';
+    m.textContent = add.length ? `Restored ${add.length} entries that were missing.` : 'Nothing to restore: everything in that backup is already here.';
   };
 
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { render(); scheduleSync(200); } });
   addEventListener('online', () => scheduleSync(200));
-  setInterval(() => { if (!document.hidden) renderKpis(entries()), renderRecent(entries()); }, 60e3);
+  setInterval(() => { if (!document.hidden) { renderKpis(entries()); renderRecent(entries()); renderBanner(); } }, 60e3);
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch {} // ask the browser not to clear app data
 
   setTab(ui.tab);
   // reopen the linked phone file (if any) before the first save, so nothing lands in the wrong place
   (FS_OK ? idb.get('file').catch(() => null) : Promise.resolve(null)).then(async h => {
-    if (h) { fileHandle = h; try { filePerm = await permOf(h, false); } catch { filePerm = 'prompt'; } }
-    render(); scheduleSync(50);
+    if (h) {
+      fileHandle = h;
+      if (!cfg.fileName) { cfg.fileName = h.name; save(K.cfg, cfg); outbox.file = outbox.file || []; save(K.out, outbox); }
+      try { filePerm = await permOf(h, false); } catch { filePerm = 'prompt'; }
+      if (filePerm !== 'granted') tstat.file = { ...(tstat.file || {}), err: 'perm', errAt: tstat.file?.errAt || Date.now() };
+    } else if (cfg.fileName) {
+      tstat.file = { ...(tstat.file || {}), err: 'The link to the file was lost. Link it again in Settings → Set up saving & backups.', errAt: tstat.file?.errAt || Date.now() };
+    }
+    render(); scheduleSync(50); scheduleBackup();
   });
 }
 init();
