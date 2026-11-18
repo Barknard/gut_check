@@ -253,3 +253,70 @@ dialog.wiz .dlg { height: 100%; overflow-y: auto; display: flex; flex-direction:
 .dyk .dyk-sub { font-size: 12px; color: var(--text-2); }
 .dyk-sub .sig { color: #5fd35f; } .dyk-sub .tent { color: #fab219; }
 .dyk-next { background: none; border: 1px solid #2c3a52; color: #9ec5f4; border-radius: 999px; padding: 3px 10px; font-size: 12px; text-transform: none; letter-spacing: 0; }
+
+/* ---------- Wizard v2: picture-led journey ---------- */
+dialog.wiz .dlg { gap: 12px; padding-bottom: 22px; }
+.wz-top { display: flex; align-items: center; min-height: 36px; }
+.wz-back { background: none; border: 0; color: var(--text-2); font-weight: 700; font-size: 15px; padding: 6px 8px 6px 0; }
+.wz-screen { display: grid; gap: 12px; text-align: center; animation: wzIn .25s ease-out; }
+.wz-screen[hidden] { display: none; }
+@keyframes wzIn { from { opacity: 0; transform: translateX(14px); } }
+.wz-screen h2 { font-size: 24px; letter-spacing: -.01em; margin: 0; }
+.wz-say { margin: 0; font-size: 15px; line-height: 1.45; color: var(--text-2); }
+.wz-say b { color: var(--text); }
+.wz-say a { color: #6da7ec; font-weight: 700; }
+.wz-tip { margin: 0; background: #20354f; border: 1px solid #2c4a72; border-radius: 12px; padding: 9px 12px; font-size: 14px; }
+.wz-ill { background: radial-gradient(120% 90% at 50% 0%, #26272b, var(--surface) 70%); border-radius: 18px; padding: 6px; }
+.wz-ill svg { width: 100%; height: auto; max-height: 200px; display: block; }
+.wz-ill text { font-family: inherit; }
+.wz-ill .it { fill: #c3c2b7; font-size: 9px; } .wz-ill .it2 { fill: #f0efec; font-size: 10px; font-weight: 700; }
+.wz-ill .im { fill: #c3c2b7; font-size: 9.5px; } .wz-ill .imb { fill: #fff; font-size: 9.5px; font-weight: 800; }
+.wz-ill .ib { fill: #fff; font-size: 15px; font-weight: 800; } .wz-ill .ib2 { fill: #fff; font-size: 9px; font-weight: 800; }
+.wz-ill .id { fill: #1a1a19; font-size: 10px; font-weight: 700; } .wz-ill .id2 { fill: #52514e; font-size: 8.5px; }
+.wz-ill .ilink { fill: #2a78d6; font-size: 10px; font-weight: 800; text-decoration: underline; }
+.tap-dot { fill: #fab219; stroke: #1a1a19; stroke-width: 1.5; }
+.tap-ring { fill: none; stroke: #fab219; stroke-width: 3; transform-box: fill-box; transform-origin: center; animation: tapPulse 1.4s ease-out infinite; }
+@keyframes tapPulse { 0% { transform: scale(.5); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
+.flow { animation: flow 1s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -12; } }
+.conf { animation: conf 1.6s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
+.conf:nth-child(odd) { animation-delay: .4s; }
+@keyframes conf { to { transform: translateY(-6px) scale(1.3); } }
+
+.big-go { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 58px; border-radius: 18px; border: 0; background: var(--text); color: var(--bg) !important;
+  font-size: 18px; font-weight: 800; text-decoration: none; box-shadow: 0 6px 18px #0006; cursor: pointer; }
+.big-go:active { transform: scale(.97); }
+.big-go.filebtn { font-size: 18px !important; }
+.wz-next { justify-self: center; background: var(--surface-3); border: 1px solid var(--border); border-radius: 999px; padding: 12px 22px; font-weight: 800; font-size: 16px; }
+.wz-next.primary-next { background: #0ca30c; border-color: #0ca30c; color: #fff; min-width: 60%; }
+.wz-link { background: none; border: 0; color: var(--text-2); text-decoration: underline; font-size: 14px; padding: 6px; justify-self: center; }
+#gsLink { min-height: 54px; }
+
+/* step-progress row */
+.journey { list-style: none; margin: 0 0 2px; padding: 0; display: grid; grid-template-columns: repeat(7, 1fr); position: relative; }
+.journey::before { content: ""; position: absolute; left: 7%; right: 7%; top: 17px; height: 3px; background: var(--surface-3); border-radius: 2px; }
+.journey li { display: grid; justify-items: center; gap: 3px; position: relative; }
+.journey button { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--border); background: var(--surface-2); font-size: 16px; display: grid; place-items: center; padding: 0; filter: grayscale(1); opacity: .6; }
+.journey span { font-size: 10px; color: var(--muted); font-weight: 700; white-space: nowrap; }
+.journey li.done button { background: #0ca30c; border-color: #0ca30c; color: #fff; filter: none; opacity: 1; font-weight: 900; }
+.journey li.now button { border-color: #fab219; background: #2a2414; filter: none; opacity: 1; transform: scale(1.18); box-shadow: 0 0 0 4px #fab21933; }
+.journey li.now span { color: var(--text); }
+
+/* numbered taps: big circled numbers */
+.taps { list-style: none; counter-reset: t; margin: 0; padding: 0; display: grid; gap: 8px; text-align: left; }
+.taps li { counter-increment: t; position: relative; background: var(--surface-2); border-radius: 14px; padding: 12px 12px 12px 52px; font-size: 15.5px; line-height: 1.35; min-height: 48px; }
+.taps li::before { content: counter(t); position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background: #fab219; color: #1a1a19; font-weight: 900; display: grid; place-items: center; }
+
+/* choice tiles */
+.tiles { display: grid; gap: 8px; text-align: left; }
+.tile { text-align: left; display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center; background: var(--surface-2); border: 2px solid var(--border); border-radius: 16px; padding: 12px; }
+.tile .ti { font-size: 28px; text-align: center; }
+.tile b { display: block; font-size: 16px; } .tile small { display: block; color: var(--text-2); font-size: 12.5px; }
+.tile em { font-style: normal; background: #0ca30c; color: #fff; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 999px; }
+.tile-main { border-color: #0ca30c; background: #14301a; padding: 16px 12px; }
+.tile-small { padding: 8px 12px; } .tile-small .ti { font-size: 20px; } .tile-small b { font-size: 14px; }
+.tile:active { transform: scale(.98); }
+.places-box.mini { text-align: left; font-size: 13px; opacity: .9; }
+dialog.wiz .places-box { text-align: left; }
+dialog.wiz label { text-align: left; }
+dialog.wiz .wz-list { text-align: left; }

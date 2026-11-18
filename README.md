@@ -42,16 +42,26 @@ All copies use the same columns:
 
 ## Setup
 
-Open the app, tap ⚙️, then **Set up saving & backups**. The wizard walks through:
-1. **A file on this phone**: create or pick the spreadsheet.
-2. **Online backup to Google Drive** (easiest on a computer):
-   - Create a Google Sheet and open **Extensions → Apps Script**.
-   - Paste the script (the wizard has a **Copy the script** button), then **Deploy → Web app** (Execute as: Me, Who has access: Anyone).
-   - Reload the Sheet and use **Gut Check → Get connection link**.
-   - Paste that link into the app on the phone.
-   - The link holds a secret key, and only people who can edit the Sheet can see it. **Gut Check → Make a new connection link** replaces the key if the link is ever shared by mistake.
-   - GitHub is offered there as an alternative.
-3. **Bring in existing data**: import an Excel/CSV/text file, or restore one of the automatic backups.
+The **first time** someone opens the app, a setup wizard pops up by itself. On later visits it doesn't; the saved Google Sheet connection is used automatically. It can be reopened any time from ⚙️ → **Set up saving & backups**.
+
+The wizard is a picture-led journey: a row of step icons at the top, a drawing of each Google screen with a pulsing dot on what to tap, and one or two short lines per step.
+
+- **Google Drive** (recommended), in 7 small steps:
+  - 📄 Make a Sheet
+  - 📋 Copy the helper code (one button)
+  - 🧩 Paste it in Extensions → Apps Script
+  - 🚀 Deploy as a Web app
+  - 👍 Allow
+  - 🔗 Get the connection link from the Sheet's Gut Check menu
+  - ✅ Paste it in the app (one button)
+- **I already have a Gut Check Sheet**: for a new phone. It jumps straight to getting and pasting the link.
+- **A file on this phone** (Android), or **Save a copy to Files** (iPhone).
+- **Bring back old data**: import a file or restore an automatic backup.
+- **GitHub**: for technical people.
+
+What the app remembers (the Sheet connection, whether it has been opened before) is stored twice on the device: localStorage plus IndexedDB. Cookies aren't used, because they would send the Sheet's secret key to the web server on every visit.
+- If the browser forgets one store, the setup comes back from the other, and the log is pulled back from the Sheet.
+- If the log itself was wiped but the app's daily backup survived, it's restored automatically.
 
 To publish the site itself: in this repo, **Settings → Pages → Deploy from a branch → `main` / root**.
 

@@ -141,87 +141,161 @@
   </form>
 </dialog>
 
-<!-- Setup wizard: where to save, and where to load from -->
+<!-- Setup wizard: a picture-led journey to save the log somewhere safe -->
 <dialog id="wizDlg" class="wiz">
   <form method="dialog" class="dlg" onsubmit="return false">
-    <div class="wz-top"><div class="wz-dots" id="wzDots"></div><button type="button" class="icon-btn" id="wzClose" aria-label="Close">✕</button></div>
+    <div class="wz-top">
+      <button type="button" class="wz-back" id="wzBack" aria-label="Back">‹ Back</button>
+      <span class="grow"></span>
+      <button type="button" class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <ol class="journey" id="wzJourney" aria-label="Steps" hidden></ol>
 
-    <section class="wz-step">
+    <!-- 1. Welcome -->
+    <section class="wz-screen" data-s="welcome">
+      <div class="wz-ill" data-ill="welcome"></div>
       <h2>Keep the log safe</h2>
-      <p>Every tap is saved inside this app. But if the phone is lost, reset, or the browser's data is cleared, anything saved only there is gone.</p>
-      <p>This setup saves the log in <b>more than one place</b>, so one copy can always be recovered. It takes about 5 minutes.</p>
-      <div class="places-box"></div>
+      <p class="wz-say">Save a copy in <b>Google Drive</b>. If the phone is lost, the log isn't.</p>
+      <button type="button" class="big-go" data-go="choose">Let's go →</button>
+      <button type="button" class="wz-link" data-close>Not now</button>
     </section>
 
-    <section class="wz-step" hidden>
-      <p class="wz-kicker">Step 1 of 3</p>
-      <h2>Save a file on this phone</h2>
-      <div id="devYes">
-        <p>Pick a folder on the phone and the app keeps a spreadsheet there. Every tap goes straight into it, and Excel or Google Sheets can open it.</p>
-        <ol class="wz-list">
-          <li>Tap <b>Create new file</b>.</li>
-          <li>Choose a folder. <b>Best:</b> a <b>Google Drive</b> folder, so the file is also copied off the phone. <b>Documents</b> or <b>Downloads</b> also work.</li>
-          <li>Keep the name <b>gut-check.xlsx</b> (Excel) or change the end to <b>.csv</b>, then tap <b>Save</b>.</li>
-          <li>If the phone asks whether Gut Check may edit the file, tap <b>Allow</b>.</li>
-        </ol>
-        <p class="set-line" id="devState"></p>
-        <div class="dlg-row wrap">
-          <button type="button" class="primary" id="devNew">Create new file…</button>
-          <button type="button" class="ghost" id="devOpen">Use existing file…</button>
-          <button type="button" class="ghost" id="devUnlink">Unlink</button>
-        </div>
-        <p class="hint">Already have a Gut Check file, or "Create new file" won't save? Use <b>Use existing file</b> and pick it. Nothing already in it is lost; the two are combined.</p>
+    <!-- 2. Where to save -->
+    <section class="wz-screen" data-s="choose" hidden>
+      <h2>Where to save?</h2>
+      <div class="tiles">
+        <button type="button" class="tile tile-main" data-go="g1"><span class="ti">📊</span><span><b>Google Drive</b><small>Best for everyone · free</small></span><em>Best</em></button>
+        <button type="button" class="tile" data-go="g6"><span class="ti">🔗</span><span><b>I already have a Gut Check Sheet</b><small>New phone? Connect it again</small></span></button>
+        <button type="button" class="tile" data-go="file" data-only="fs"><span class="ti">📱</span><span><b>A file on this phone</b><small>Android · Excel file in any folder</small></span></button>
+        <button type="button" class="tile" data-go="copy" data-only="nofs"><span class="ti">🗂️</span><span><b>Save a copy to Files</b><small>iPhone · do it every week or two</small></span></button>
+        <button type="button" class="tile" data-go="restore"><span class="ti">⏪</span><span><b>Bring back old data</b><small>Import a file or restore a backup</small></span></button>
+        <button type="button" class="tile tile-small" data-go="github"><span class="ti">⚙️</span><span><b>GitHub</b><small>For technical people</small></span></button>
       </div>
-      <div id="devNo" hidden>
-        <p>iPhones don't let any website keep a file up to date by itself. Instead:</p>
-        <ul class="wz-list">
-          <li>Set up the <b>online backup</b> in the next step. It saves automatically and is the safest option on iPhone.</li>
-          <li>Also, every week or two, tap <b>Save a copy to Files</b> below and choose <b>iCloud Drive</b> or <b>On My iPhone</b>.</li>
-        </ul>
-        <div class="dlg-row wrap"><button type="button" class="primary" id="devShare">Save a copy to Files</button></div>
-        <p class="hint" id="lastCopy"></p>
-      </div>
-      <span id="devMsg" class="set-msg"></span>
+      <div class="places-box mini"></div>
     </section>
 
-    <section class="wz-step" id="wzGh" hidden>
-      <p class="wz-kicker">Step 2 of 3 · Recommended</p>
-      <h2>Back up online to Google Drive (free)</h2>
-      <p>Every entry is saved into a <b>Google Sheet</b> in your own Google Drive. It saves automatically, keeps past versions, and works on any phone. Only you can see it.</p>
-      <p class="set-line" id="gsState"></p>
-      <p class="wz-note">💻 Steps 1–5 are easiest <b>on a computer</b>, signed in to your Google account. The phone only needs the link at the end.</p>
-      <ol class="wz-list">
-        <li><a href="https://sheets.new" target="_blank" rel="noopener">Create a new Google Sheet</a> and name it <b>Gut Check log</b>.</li>
-        <li>In the Sheet, open <b>Extensions → Apps Script</b>. Delete the code that's there, then paste the Gut Check script:
-          <span class="dlg-row wrap" style="margin-top:6px"><button type="button" class="ghost" id="gsCopy">Copy the script</button><a href="google-sheet/Code.gs" target="_blank" rel="noopener">view it</a></span>
-          Press <b>Save</b> (the disk icon).</li>
-        <li>Press <b>Deploy → New deployment</b>. Click the gear ⚙ next to "Select type" and choose <b>Web app</b>. Set <b>Execute as: Me</b> and <b>Who has access: Anyone</b>, then press <b>Deploy</b>.</li>
-        <li>Press <b>Authorize access</b> and choose your Google account. Google will say <i>"Google hasn't verified this app"</i>. That's expected, because the script is yours and not from an app store. Press <b>Advanced → Go to … (unsafe)</b>, then <b>Allow</b>.</li>
-        <li>Go back to the Sheet and <b>reload the page</b>. A new <b>Gut Check</b> menu appears. Choose <b>Get connection link</b>, then <b>Copy link</b> (or <b>Email it to myself</b>).</li>
-        <li>On this phone, paste the link below and press <b>Connect</b>. The link is also kept in the Sheet's <b>Connect</b> tab, which the Google Sheets app can open.</li>
+    <!-- Google Sheet journey: 7 small steps -->
+    <section class="wz-screen" data-s="g1" hidden>
+      <div class="wz-ill" data-ill="g1"></div>
+      <h2>Make a new Sheet</h2>
+      <p class="wz-tip">💻 Easiest on a <b>computer</b>. At the very end you paste one link on the phone.</p>
+      <a class="big-go" href="https://sheets.new" target="_blank" rel="noopener">Open Google Sheets ↗</a>
+      <p class="wz-say">A blank Sheet opens. Name it <b>Gut Check log</b>, then come back here.</p>
+      <button type="button" class="wz-next" data-go="g2">Done, next →</button>
+    </section>
+
+    <section class="wz-screen" data-s="g2" hidden>
+      <div class="wz-ill" data-ill="g2"></div>
+      <h2>Copy the helper code</h2>
+      <button type="button" class="big-go" id="gsCopy">📋 Copy code</button>
+      <p class="wz-say">This small code lets the Sheet save the log. <a href="google-sheet/Code.gs" target="_blank" rel="noopener">See it</a></p>
+      <span id="gsCopyMsg" class="set-msg"></span>
+      <button type="button" class="wz-next" data-go="g3">Copied, next →</button>
+    </section>
+
+    <section class="wz-screen" data-s="g3" hidden>
+      <div class="wz-ill" data-ill="g3"></div>
+      <h2>Paste it in the Sheet</h2>
+      <ol class="taps">
+        <li>Tap <b>Extensions</b> → <b>Apps Script</b></li>
+        <li>Delete what's there</li>
+        <li><b>Paste</b>, then press <b>💾 Save</b></li>
       </ol>
-      <label>Connection link<textarea id="gsLink" rows="3" placeholder="https://…#gsheet=…&amp;key=…" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea></label>
-      <div class="dlg-row">
-        <button type="button" class="ghost" id="gsDisconnect">Disconnect</button><span class="grow"></span>
-        <button type="button" class="primary" id="gsConnect">Connect</button>
-      </div>
-      <span id="gsMsg" class="set-msg"></span>
+      <button type="button" class="wz-next" data-go="g4">Done, next →</button>
+    </section>
 
-      <details class="adv gh-alt"><summary>Or use GitHub instead (for technical users)</summary>
+    <section class="wz-screen" data-s="g4" hidden>
+      <div class="wz-ill" data-ill="g4"></div>
+      <h2>Turn it on</h2>
+      <ol class="taps">
+        <li><b>Deploy</b> → <b>New deployment</b></li>
+        <li>⚙ → <b>Web app</b></li>
+        <li>Who has access: <b>Anyone</b></li>
+        <li>Press <b>Deploy</b></li>
+      </ol>
+      <p class="wz-say">"Anyone" only lets it hear from this app. The log stays locked with a secret key.</p>
+      <button type="button" class="wz-next" data-go="g5">Done, next →</button>
+    </section>
+
+    <section class="wz-screen" data-s="g5" hidden>
+      <div class="wz-ill" data-ill="g5"></div>
+      <h2>Say yes</h2>
+      <ol class="taps">
+        <li><b>Authorize access</b> → pick your account</li>
+        <li><b>Advanced</b> → <b>Go to … (unsafe)</b></li>
+        <li><b>Allow</b></li>
+      </ol>
+      <p class="wz-say">Google says "unverified" because the code is yours, not from a store. That's normal.</p>
+      <button type="button" class="wz-next" data-go="g6">Done, next →</button>
+    </section>
+
+    <section class="wz-screen" data-s="g6" hidden>
+      <div class="wz-ill" data-ill="g6"></div>
+      <h2>Get your link</h2>
+      <ol class="taps">
+        <li><b>Reload</b> the Sheet</li>
+        <li><b>Gut Check</b> menu → <b>Get connection link</b></li>
+        <li><b>Copy link</b>. On a computer? <b>Email it to myself</b></li>
+      </ol>
+      <p class="wz-say">On a phone, the link is also in the Sheet's <b>Connect</b> tab (Google Sheets app).</p>
+      <button type="button" class="wz-next" data-go="g7">Got it, next →</button>
+    </section>
+
+    <section class="wz-screen" data-s="g7" hidden>
+      <div class="wz-ill" data-ill="g7"></div>
+      <h2>Paste your link</h2>
+      <button type="button" class="big-go" id="gsPaste">📥 Paste link</button>
+      <textarea id="gsLink" rows="2" placeholder="…or long-press here and Paste" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+      <button type="button" class="wz-next primary-next" id="gsConnect">Connect ✓</button>
+      <span id="gsMsg" class="set-msg"></span>
+      <p class="set-line" id="gsState"></p>
+      <button type="button" class="wz-link" id="gsDisconnect">Disconnect the Sheet</button>
+    </section>
+
+    <!-- Android: a file on this phone -->
+    <section class="wz-screen" data-s="file" hidden>
+      <div class="wz-ill" data-ill="file"></div>
+      <h2>Save a file on this phone</h2>
+      <button type="button" class="big-go" id="devNew">📁 Pick a folder</button>
+      <p class="wz-say">Tip: pick a <b>Google Drive</b> folder, so it's off the phone too. Keep the name, press <b>Save</b>, then <b>Allow</b>.</p>
+      <p class="set-line" id="devState"></p>
+      <span id="devMsg" class="set-msg"></span>
+      <button type="button" class="wz-link" id="devOpen">Use a file I already have</button>
+      <button type="button" class="wz-link" id="devUnlink">Stop saving to this file</button>
+    </section>
+
+    <!-- iPhone: copies to Files -->
+    <section class="wz-screen" data-s="copy" hidden>
+      <div class="wz-ill" data-ill="copy"></div>
+      <h2>Save a copy to Files</h2>
+      <button type="button" class="big-go" id="devShare">🗂️ Save a copy now</button>
+      <p class="wz-say">Choose <b>Save to Files</b> → <b>iCloud Drive</b>. iPhones can't update a file by themselves, so do this every week or two. Google Drive saves automatically.</p>
+      <p class="hint" id="lastCopy"></p>
+      <span id="devCopyMsg" class="set-msg"></span>
+    </section>
+
+    <!-- Bring back old data -->
+    <section class="wz-screen" data-s="restore" hidden>
+      <div class="wz-ill" data-ill="restore"></div>
+      <h2>Bring back old data</h2>
+      <label class="big-go filebtn">📄 Import a file<input type="file" id="wzImp" accept=".csv,.txt,.tsv,.xlsx,.xls,text/csv,text/plain"></label>
+      <p class="wz-say">Excel, CSV or text. Nothing gets overwritten.</p>
+      <h3 class="wz-h3">Automatic backups</h3>
+      <div id="bkList" class="bk-list"></div>
+      <span id="wzImpMsg" class="set-msg"></span>
+    </section>
+
+    <!-- GitHub (advanced) -->
+    <section class="wz-screen" data-s="github" hidden>
+      <h2>GitHub</h2>
+      <p class="wz-say">For technical people. A private GitHub repository keeps every version.</p>
       <p class="set-line" id="ghState"></p>
       <ol class="wz-list">
-        <li>Sign in to GitHub, or make a free account. <a href="https://github.com/signup" target="_blank" rel="noopener">Open GitHub</a></li>
-        <li><a id="ghRepoLink" href="https://github.com/new" target="_blank" rel="noopener">Create the storage space</a>. The name <b class="repo-name">gut-check-data</b> and <b>Private</b> are filled in. Check that Private is selected, then press <b>Create repository</b>.</li>
-        <li><a id="ghTokenLink" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create an access key</a>. On that page:
-          <ul>
-            <li>Under <b>Repository access</b>, choose <b>Only select repositories</b>, then pick <b class="repo-name">gut-check-data</b>.</li>
-            <li>Check that <b>Contents</b> says <b>Read and write</b>.</li>
-            <li>Press <b>Generate token</b>, then copy the key it shows.</li>
-          </ul></li>
-        <li>Come back here, fill in the boxes below, and press <b>Connect</b>.</li>
+        <li><a id="ghRepoLink" href="https://github.com/new" target="_blank" rel="noopener">Create the repository</a> (name <b class="repo-name">gut-check-data</b>, <b>Private</b>, already filled in).</li>
+        <li><a id="ghTokenLink" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create an access key</a>: <b>Only select repositories</b> → <b class="repo-name">gut-check-data</b>, <b>Contents: Read and write</b>, <b>Generate</b>, copy.</li>
       </ol>
       <label>GitHub username<input id="sOwner" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="your-username"></label>
-      <label>Storage space (repository) name<input id="sRepo" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+      <label>Repository name<input id="sRepo" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
       <label>Access key<input id="sToken" type="password" autocomplete="off" placeholder="github_pat_…" spellcheck="false"></label>
       <details class="adv"><summary>Advanced</summary>
         <div class="two">
@@ -229,36 +303,21 @@
           <label>File<input id="sPath" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
         </div>
       </details>
-      <p class="hint">The key stays on this phone. The app refuses to save to a public repository.</p>
       <div class="dlg-row">
         <button type="button" class="ghost" id="setDisconnect">Disconnect</button><span class="grow"></span>
         <button type="button" class="primary" id="setSave">Connect</button>
       </div>
       <span id="setMsg" class="set-msg"></span>
-      </details>
     </section>
 
-    <section class="wz-step" hidden>
-      <p class="wz-kicker">Step 3 of 3</p>
-      <h2>Bring in existing data</h2>
-      <p>A file or GitHub you just linked has already been read in. Use this if there's another log file to add, such as a copy saved earlier. Nothing is overwritten and duplicates are skipped.</p>
-      <div class="dlg-row"><label class="ghost filebtn">Import a file…<input type="file" id="wzImp" accept=".csv,.txt,.tsv,.xlsx,.xls,text/csv,text/plain"></label></div>
-      <h3 class="wz-h3">Automatic backups inside the app</h3>
-      <p class="hint">The app keeps a copy each day for the last 30 days. Restore puts back anything that's missing and doesn't remove anything.</p>
-      <div id="bkList" class="bk-list"></div>
-      <span id="wzImpMsg" class="set-msg"></span>
-    </section>
-
-    <section class="wz-step" hidden>
-      <h2>All set</h2>
+    <!-- Done -->
+    <section class="wz-screen" data-s="done" hidden>
+      <div class="wz-ill" data-ill="done"></div>
+      <h2>All set!</h2>
       <div class="places-box"></div>
-      <p class="hint">The badge at the top of the app shows how many places the log is saved in. If saving ever stops working, a warning appears on the home screen.</p>
+      <button type="button" class="big-go" data-close>Start logging →</button>
+      <button type="button" class="wz-link" data-go="choose">Add another place</button>
     </section>
-
-    <div class="wz-nav">
-      <button type="button" class="ghost" id="wzBack">Back</button><span class="grow"></span>
-      <button type="button" class="primary" id="wzNext">Next</button>
-    </div>
   </form>
 </dialog>
 

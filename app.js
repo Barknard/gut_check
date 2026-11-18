@@ -115,6 +115,8 @@ const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } cat
 const fixEv = e => e && e.ev === 'miralax' ? { ...e, ev: 'imodium' } : e; // the Imodium button used to say MiraLAX
 const fixOp = o => o.op === 'add' ? { ...o, e: fixEv(o.e) } : o;
 
+// a brand-new browser (or one whose storage was cleared) has no saved log yet
+const FRESH = (() => { try { return localStorage.getItem(K.snap) === null; } catch { return true; } })();
 let local = load(K.snap, []).map(fixEv);
 let outbox = load(K.out, null);
 let tstat = load(K.tstat, {});   // per target: { ok: last successful save, err: last problem, errAt: when it started }
@@ -133,6 +135,10 @@ function defaultCfg() {
   const h = location.hostname, gh = h.endsWith('.github.io');
   return { owner: gh ? h.split('.')[0] : '', repo: 'gut-check-data', branch: '', path: 'gut-check.csv', token: '', fileName: '', gsUrl: '', gsKey: '' };
 }
+// Remembered twice on the device (localStorage + IndexedDB). Cookies aren't used: they'd send the
+// Sheet's secret key to the web server on every page load.
+function remember(k, v) { save('gl.' + k, v); try { idb.set('mem:' + k, v).catch(() => {}); } catch {} }
+function saveCfg() { remember('cfg', cfg); }
 const connected = () => !!(cfg.owner && cfg.repo && cfg.token && cfg.path);
 const gsConnected = () => !!(cfg.gsUrl && cfg.gsKey);
 const targets = () => [cfg.fileName && 'file', gsConnected() && 'gsheet', connected() && 'github'].filter(Boolean);
@@ -1037,6 +1043,77 @@ function renderBanner() {
   el.innerHTML = html; el.hidden = !html;
 }
 
+/* ---------- wizard pictures: little mock-ups of each screen, with a pulsing dot on what to tap ---------- */
+const TAP = (x, y) => `<circle class="tap-ring" cx="${x}" cy="${y}" r="13"/><circle class="tap-dot" cx="${x}" cy="${y}" r="6"/>`;
+const WIN = (x, y, w, h, title = '') => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="9" fill="#2c2c29" stroke="#46463f"/>
+  <circle cx="${x + 10}" cy="${y + 9}" r="2.5" fill="#e66767"/><circle cx="${x + 18}" cy="${y + 9}" r="2.5" fill="#fab219"/><circle cx="${x + 26}" cy="${y + 9}" r="2.5" fill="#5fd35f"/>
+  ${title ? `<text x="${x + w / 2}" y="${y + 12}" class="it" text-anchor="middle">${title}</text>` : ''}`;
+const GRID = (x, y, w, h) => { let g = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#f4f6f8"/><rect x="${x}" y="${y}" width="${w}" height="10" fill="#cfe9d8"/>`;
+  for (let i = 1; i < 6; i++) g += `<line x1="${x}" x2="${x + w}" y1="${y + 10 + i * (h - 10) / 6}" y2="${y + 10 + i * (h - 10) / 6}" stroke="#d6dbe1"/>`;
+  for (let i = 1; i < 5; i++) g += `<line y1="${y}" y2="${y + h}" x1="${x + i * w / 5}" x2="${x + i * w / 5}" stroke="#d6dbe1"/>`; return g; };
+const SHEETICON = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})"><path d="M0 4 a4 4 0 0 1 4 -4 h18 l10 10 v30 a4 4 0 0 1 -4 4 h-24 a4 4 0 0 1 -4 -4z" fill="#22a55a"/><path d="M22 0 v10 h10" fill="#7fd3a1"/><rect x="6" y="18" width="20" height="16" fill="#fff"/><path d="M6 24 h20 M6 29 h20 M14 18 v16" stroke="#22a55a" stroke-width="1.5"/></g>`;
+const svg = (inner, label) => `<svg viewBox="0 0 280 150" role="img" aria-label="${label}">${inner}</svg>`;
+const ILL = {
+  welcome: svg(`<rect x="38" y="18" width="72" height="118" rx="13" fill="#2c2c29" stroke="#55554e" stroke-width="2"/><rect x="45" y="30" width="58" height="94" rx="5" fill="#1a1a19"/>
+    <g transform="translate(56 50) scale(.56)">${ICON.poop.replace(/<svg[^>]*>|<\/svg>/g, '')}</g>
+    <path d="M116 78 C140 52 160 52 178 66" stroke="#9ec5f4" stroke-width="3" fill="none" stroke-dasharray="6 6" class="flow"/><path d="M172 58 l9 9 l-12 3" fill="none" stroke="#9ec5f4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M186 104 h66 a19 19 0 0 0 0 -38 a26 26 0 0 0 -50 -7 a21 21 0 0 0 -16 45z" fill="#20354f" stroke="#6da7ec" stroke-width="2.5"/>
+    ${SHEETICON(206, 60, .9)}<circle cx="248" cy="96" r="13" fill="#0ca30c" stroke="#1a1a19" stroke-width="3"/><path d="M242 96 l4 4 l8 -8" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`, 'Phone saving to Google Drive'),
+  g1: svg(`${WIN(30, 12, 220, 126, 'sheets.new')}${GRID(42, 30, 196, 96)}<circle cx="236" cy="122" r="20" fill="#22a55a"/><path d="M236 112 v20 M226 122 h20" stroke="#fff" stroke-width="4" stroke-linecap="round"/>${TAP(236, 122)}`, 'A new blank Google Sheet'),
+  g2: svg(`<rect x="70" y="22" width="96" height="118" rx="10" fill="#e9edf2"/><rect x="94" y="13" width="48" height="18" rx="6" fill="#8d96a1"/>
+    ${[[84, 46, 50, '#3987e5'], [84, 58, 66, '#22a55a'], [92, 70, 54, '#8d96a1'], [92, 82, 44, '#d95926'], [84, 94, 60, '#3987e5'], [92, 106, 40, '#8d96a1'], [84, 118, 30, '#22a55a']].map(([x, y, w, c]) => `<rect x="${x}" y="${y}" width="${w}" height="6" rx="3" fill="${c}"/>`).join('')}
+    <rect x="182" y="66" width="80" height="34" rx="17" fill="#3987e5"/><text x="222" y="88" class="ib" text-anchor="middle">Copy</text>${TAP(258, 96)}`, 'Copy the code'),
+  g3: svg(`${WIN(14, 10, 252, 132)}${SHEETICON(24, 24, .5)}<text x="44" y="38" class="it2">Gut Check log</text>
+    ${['File', 'Edit', 'View', 'Insert', 'Data', 'Extensions'].map((t, i) => `<text x="${44 + i * 33}" y="52" class="im">${t}</text>`).join('')}
+    <rect x="${44 + 5 * 33 - 5}" y="42" width="58" height="14" rx="4" fill="none" stroke="#fab219" stroke-width="2"/>
+    <rect x="200" y="60" width="92" height="64" rx="6" fill="#3a3a35" stroke="#55554e" transform="translate(-30 0)"/>
+    <text x="180" y="78" class="im">Add-ons</text><text x="180" y="96" class="im">Macros</text>
+    <rect x="174" y="104" width="82" height="16" rx="4" fill="#fab219" opacity=".25"/><text x="180" y="116" class="imb">Apps Script</text>${TAP(250, 114)}
+    ${GRID(24, 62, 140, 70)}`, 'Extensions menu, then Apps Script'),
+  g4: svg(`${WIN(8, 10, 128, 130, 'Apps Script')}<rect x="78" y="24" width="52" height="16" rx="8" fill="#3987e5"/><text x="104" y="35" class="ib2" text-anchor="middle">Deploy ▾</text>
+    <rect x="40" y="44" width="92" height="40" rx="5" fill="#3a3a35" stroke="#55554e"/><text x="47" y="59" class="imb">New deployment</text><text x="47" y="76" class="im">Manage…</text>${TAP(128, 58)}
+    ${[50, 98, 110, 122].map((y, i) => `<rect x="18" y="${y + 40}" width="${[60, 90, 70, 50][i]}" height="4" rx="2" fill="#4a4a45"/>`).join('')}
+    <path d="M140 75 h10" stroke="#9ec5f4" stroke-width="3"/><path d="M146 70 l6 5 l-6 5" stroke="#9ec5f4" stroke-width="3" fill="none"/>
+    <rect x="156" y="14" width="116" height="122" rx="9" fill="#e9edf2"/><text x="166" y="32" class="id">⚙ Web app</text>
+    <text x="166" y="54" class="id2">Execute as</text><rect x="166" y="58" width="96" height="14" rx="3" fill="#fff" stroke="#c3c9d1"/><text x="171" y="68" class="id">Me</text>
+    <text x="166" y="86" class="id2">Who has access</text><rect x="166" y="90" width="96" height="14" rx="3" fill="#fff" stroke="#fab219" stroke-width="2.5"/><text x="171" y="100" class="id">Anyone</text>
+    <rect x="216" y="112" width="46" height="16" rx="8" fill="#3987e5"/><text x="239" y="123" class="ib2" text-anchor="middle">Deploy</text>${TAP(262, 126)}`, 'Deploy as a web app, access Anyone'),
+  g5: svg(`<rect x="10" y="22" width="80" height="100" rx="9" fill="#e9edf2"/><text x="50" y="44" text-anchor="middle" style="font-size:20px">⚠️</text><text x="50" y="62" class="id" text-anchor="middle">Not verified</text>
+    <text x="22" y="98" class="ilink">Advanced</text>${TAP(74, 99)}
+    <path d="M96 72 h10" stroke="#9ec5f4" stroke-width="3"/>
+    <rect x="112" y="22" width="80" height="100" rx="9" fill="#e9edf2"/><text x="152" y="44" class="id" text-anchor="middle">Advanced</text><text x="120" y="80" class="ilink">Go to Gut</text><text x="120" y="92" class="ilink">Check (unsafe)</text>${TAP(186, 94)}
+    <path d="M198 72 h10" stroke="#9ec5f4" stroke-width="3"/>
+    <rect x="212" y="22" width="60" height="100" rx="9" fill="#e9edf2"/><text x="242" y="48" text-anchor="middle" style="font-size:18px">🔓</text><rect x="222" y="84" width="40" height="18" rx="9" fill="#3987e5"/><text x="242" y="96" class="ib2" text-anchor="middle">Allow</text>${TAP(264, 100)}`, 'Advanced, Go to, Allow'),
+  g6: svg(`${WIN(14, 10, 252, 132)}${SHEETICON(24, 24, .5)}<text x="44" y="38" class="it2">Gut Check log</text>
+    ${['File', 'Edit', 'View', 'Data', 'Extensions'].map((t, i) => `<text x="${44 + i * 33}" y="52" class="im">${t}</text>`).join('')}<text x="${44 + 5 * 33 + 4}" y="52" class="imb">Gut Check</text>
+    <rect x="${44 + 5 * 33}" y="42" width="56" height="14" rx="4" fill="none" stroke="#fab219" stroke-width="2"/>
+    <rect x="128" y="60" width="128" height="40" rx="6" fill="#3a3a35" stroke="#55554e"/><rect x="132" y="64" width="120" height="16" rx="4" fill="#fab219" opacity=".25"/><text x="138" y="76" class="imb">Get connection link</text>
+    <text x="138" y="94" class="im">Make a new link</text>${TAP(240, 72)}
+    ${GRID(24, 62, 96, 70)}<rect x="132" y="108" width="62" height="20" rx="10" fill="#3987e5"/><text x="163" y="122" class="ib2" text-anchor="middle">Copy link</text>${TAP(196, 124)}`, 'Gut Check menu, Get connection link, Copy link'),
+  g7: svg(`<rect x="96" y="6" width="88" height="140" rx="14" fill="#2c2c29" stroke="#55554e" stroke-width="2"/><rect x="104" y="20" width="72" height="112" rx="5" fill="#1a1a19"/>
+    <rect x="110" y="40" width="60" height="22" rx="11" fill="#f0efec"/><text x="140" y="55" class="id" text-anchor="middle">📥 Paste</text>${TAP(172, 56)}
+    <rect x="110" y="70" width="60" height="18" rx="4" fill="#2c2c29" stroke="#55554e"/><text x="114" y="82" class="im" style="font-size:7px">https://…#gsheet</text>
+    <rect x="110" y="96" width="60" height="20" rx="10" fill="#0ca30c"/><text x="140" y="110" class="ib2" text-anchor="middle">Connect ✓</text>
+    ${SHEETICON(30, 54, 1)}<path d="M72 76 h18" stroke="#9ec5f4" stroke-width="3" stroke-dasharray="4 4" class="flow"/><path d="M86 70 l6 6 l-6 6" stroke="#9ec5f4" stroke-width="3" fill="none"/>`, 'Paste the link and connect'),
+  file: svg(`<rect x="34" y="14" width="78" height="124" rx="13" fill="#2c2c29" stroke="#55554e" stroke-width="2"/><rect x="42" y="28" width="62" height="96" rx="5" fill="#1a1a19"/>
+    <path d="M52 62 h16 l5 6 h22 v34 h-43z" fill="#fab219"/><path d="M52 72 h43 v30 h-43z" fill="#ffd166"/>
+    <path d="M122 76 h24" stroke="#9ec5f4" stroke-width="3" stroke-dasharray="5 5" class="flow"/><path d="M142 70 l7 6 l-7 6" stroke="#9ec5f4" stroke-width="3" fill="none"/>
+    <path d="M168 40 a5 5 0 0 1 5 -5 h40 l18 18 v62 a5 5 0 0 1 -5 5 h-53 a5 5 0 0 1 -5 -5z" fill="#e9edf2"/><path d="M213 35 v18 h18" fill="#c3c9d1"/>
+    <rect x="178" y="68" width="42" height="34" rx="3" fill="#22a55a"/><text x="199" y="90" class="ib2" text-anchor="middle">XLSX</text><text x="200" y="134" class="it" text-anchor="middle">gut-check.xlsx</text>`, 'Saving a file on the phone'),
+  copy: svg(`<rect x="40" y="30" width="62" height="70" rx="12" fill="#3987e5"/><path d="M71 46 v34 M60 57 l11 -11 l11 11" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><text x="71" y="122" class="it" text-anchor="middle">Share</text>
+    <path d="M114 64 h30" stroke="#9ec5f4" stroke-width="3" stroke-dasharray="5 5" class="flow"/><path d="M140 58 l7 6 l-7 6" stroke="#9ec5f4" stroke-width="3" fill="none"/>
+    <path d="M164 40 h30 l8 9 h44 a6 6 0 0 1 6 6 v44 a6 6 0 0 1 -6 6 h-82 a6 6 0 0 1 -6 -6v-53 a6 6 0 0 1 6 -6z" fill="#6da7ec"/><path d="M158 60 h94 v39 a6 6 0 0 1 -6 6 h-82 a6 6 0 0 1 -6 -6z" fill="#9ec5f4"/><text x="208" y="122" class="it" text-anchor="middle">Save to Files</text>`, 'Share, then Save to Files'),
+  restore: svg(`<circle cx="92" cy="76" r="44" fill="none" stroke="#9ec5f4" stroke-width="6" stroke-dasharray="230 60" transform="rotate(-60 92 76)"/><path d="M50 42 l2 22 l20 -8" fill="none" stroke="#9ec5f4" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M92 52 v26 l16 10" stroke="#f0efec" stroke-width="5" fill="none" stroke-linecap="round"/>
+    ${[40, 62, 84, 106].map((y, i) => `<rect x="160" y="${y}" width="96" height="16" rx="5" fill="${i === 1 ? '#22a55a' : '#2c2c29'}" stroke="#46463f"/>`).join('')}`, 'Bring back old data'),
+  done: svg(`<rect x="44" y="20" width="68" height="112" rx="12" fill="#2c2c29" stroke="#55554e" stroke-width="2"/>
+    <g transform="translate(58 46) scale(.62)">${ICON.poop.replace(/<svg[^>]*>|<\/svg>/g, '')}</g>
+    <path d="M118 76 h44" stroke="#5fd35f" stroke-width="4"/>${SHEETICON(176, 52, 1.1)}
+    <circle cx="104" cy="122" r="13" fill="#0ca30c" stroke="#1a1a19" stroke-width="3"/><path d="M98 122 l4 4 l8 -8" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <circle cx="212" cy="104" r="13" fill="#0ca30c" stroke="#1a1a19" stroke-width="3"/><path d="M206 104 l4 4 l8 -8" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>
+    ${[[30, 20, '#fab219'], [250, 30, '#e87ba4'], [140, 24, '#6da7ec'], [262, 120, '#5fd35f'], [24, 120, '#d95926'], [150, 130, '#fab219']].map(([x, y, c]) => `<circle class="conf" cx="${x}" cy="${y}" r="4" fill="${c}"/>`).join('')}`, 'All set'),
+};
+
 /* ---------- wire up ---------- */
 function init() {
   $$('[data-icon]').forEach(el => el.innerHTML = ICON[el.dataset.icon]);
@@ -1085,17 +1162,18 @@ function init() {
   const note = (t, c = '') => { const m = $('#setNote'); m.textContent = t; m.className = 'set-msg ' + c; };
   const msg = (t, c = '') => { const m = $('#setMsg'); m.textContent = t; m.className = 'set-msg ' + c; };
   const dmsg = (t, c = '') => { const m = $('#devMsg'); m.textContent = t; m.className = 'set-msg ' + c; };
+  const cmsg = (t, c = '') => { const m = $('#devCopyMsg'); m.textContent = t; m.className = 'set-msg ' + c; };
   $('#settingsBtn').onclick = () => { note(''); refreshPlaces(); $('#setDlg').showModal(); };
-  $('#openWizard').onclick = () => openWizard(0);
+  $('#openWizard').onclick = () => openWizard('choose');
   const allowFile = async () => { // must run straight from a tap
-    if (!fileHandle) return openWizard(1);
+    if (!fileHandle) return openWizard('file');
     try { filePerm = await permOf(fileHandle, true); } catch {}
     if (filePerm === 'granted') { tstat.file = { ...(tstat.file || {}), err: '' }; sync(); }
   };
   $('#syncBtn').onclick = () => {
     const s = $('#syncBtn').dataset.s;
     if (s === 'perm') return allowFile();
-    if (s === 'local') return openWizard(0);
+    if (s === 'local') return openWizard('welcome');
     if (s === 'err') { refreshPlaces(); $('#setDlg').showModal(); }
     sync();
   };
@@ -1103,7 +1181,7 @@ function init() {
   $('#banner').onclick = e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.b === 'allow') allowFile();
-    else if (b.dataset.b === 'wizard') openWizard(0);
+    else if (b.dataset.b === 'wizard') openWizard('welcome');
     else { refreshPlaces(); $('#setDlg').showModal(); }
   };
 
@@ -1137,28 +1215,42 @@ function init() {
   };
   $('#impFile').onchange = onImport(note);
 
-  // ---------- setup wizard ----------
-  const WZ = $$('.wz-step').length;
-  let wzStep = 0;
-  function showStep(n) {
-    wzStep = n;
-    $$('.wz-step').forEach((el, i) => el.hidden = i !== n);
-    $('#wzBack').hidden = n === 0;
-    $('#wzNext').textContent = n === 0 ? 'Start' : n === WZ - 1 ? 'Done' : 'Next';
-    $('#wzDots').innerHTML = Array.from({ length: WZ }, (_, i) => `<i class="${i === n ? 'on' : ''}"></i>`).join('');
-    if (n === 3) renderBackups();
+  // ---------- setup wizard: a journey of small screens ----------
+  const JOURNEY = [['g1', '📄', 'Sheet'], ['g2', '📋', 'Copy'], ['g3', '🧩', 'Paste'], ['g4', '🚀', 'Turn on'], ['g5', '👍', 'Allow'], ['g6', '🔗', 'Link'], ['g7', '✅', 'Connect']];
+  $$('.wz-ill').forEach(el => el.innerHTML = ILL[el.dataset.ill] || '');
+  $$('[data-only="fs"]').forEach(el => el.hidden = !FS_OK);
+  $$('[data-only="nofs"]').forEach(el => el.hidden = FS_OK);
+  let wzCur = null, wzHist = [];
+  function go(id, push = true) {
+    if (push && wzCur && wzCur !== id) wzHist.push(wzCur);
+    wzCur = id;
+    $$('.wz-screen').forEach(el => el.hidden = el.dataset.s !== id);
+    const j = JOURNEY.findIndex(x => x[0] === id), jEl = $('#wzJourney');
+    jEl.hidden = j < 0;
+    if (j >= 0) jEl.innerHTML = JOURNEY.map(([sid, icon, label], i) => `<li class="${i < j ? 'done' : i === j ? 'now' : ''}"><button type="button" data-go="${sid}" aria-label="${label}">${i < j ? '✓' : icon}</button><span>${label}</span></li>`).join('');
+    $('#wzBack').style.visibility = wzHist.length ? 'visible' : 'hidden';
+    if (id === 'restore') renderBackups();
+    if (id === 'g2') loadGsCode();
     refreshPlaces(); fillDev(); fillGh(); fillGs();
     $('#wizDlg .dlg').scrollTop = 0;
   }
-  function openWizard(n) { $('#setDlg').open && $('#setDlg').close(); msg(''); dmsg(''); gsmsg(''); $('#wzImpMsg').textContent = ''; showStep(n); $('#wizDlg').showModal(); }
-  $('#wzNext').onclick = () => wzStep === WZ - 1 ? $('#wizDlg').close() : showStep(wzStep + 1);
-  $('#wzBack').onclick = () => showStep(wzStep - 1);
-  $('#wzClose').onclick = () => $('#wizDlg').close();
+  function openWizard(id = 'welcome') {
+    if ($('#setDlg').open) $('#setDlg').close();
+    msg(''); dmsg(''); gsmsg(''); $('#wzImpMsg').textContent = ''; $('#devCopyMsg').textContent = ''; $('#gsCopyMsg').textContent = '';
+    wzHist = []; wzCur = null; go(id, false);
+    if (!$('#wizDlg').open) { $('#wizDlg').showModal(); document.activeElement && document.activeElement.blur(); }
+  }
+  $('#wizDlg').addEventListener('click', e => {
+    const g = e.target.closest('[data-go]'); if (g) { e.preventDefault(); return go(g.dataset.go); }
+    if (e.target.closest('[data-close]')) $('#wizDlg').close();
+  });
+  $('#wzBack').onclick = () => { const prev = wzHist.pop(); if (prev) go(prev, false); };
+  $('#wizDlg').addEventListener('close', () => remember('seen', true));
 
   // step 1: a file on this phone
   function fillDev() {
-    $('#devYes').hidden = !FS_OK; $('#devNo').hidden = FS_OK; $('#devUnlink').hidden = !cfg.fileName;
-    $('#devNew').textContent = cfg.fileName ? 'Switch to a new file…' : 'Create new file…';
+    $('#devUnlink').hidden = !cfg.fileName;
+    $('#devNew').textContent = cfg.fileName ? '📁 Pick a different folder' : '📁 Pick a folder';
     $('#devState').innerHTML = cfg.fileName ? `✓ Saving to <b>${esc(cfg.fileName)}</b>${tstat.file?.err === 'perm' ? ' (needs permission again: tap “Allow” on the home screen)' : ''}` : 'No file linked yet.';
     const lc = load(K.copy, 0);
     $('#lastCopy').textContent = lc ? `Last copy saved ${ago(lc)}.` : 'No copy saved yet.';
@@ -1169,18 +1261,18 @@ function init() {
       const h = create ? await window.showSaveFilePicker({ suggestedName: 'gut-check.xlsx', types })
                        : (await window.showOpenFilePicker({ types, multiple: false }))[0];
       if (await permOf(h, true) !== 'granted') return dmsg('The app needs permission to edit that file.', 'err');
-      fileHandle = h; filePerm = 'granted'; cfg.fileName = h.name; save(K.cfg, cfg);
+      fileHandle = h; filePerm = 'granted'; cfg.fileName = h.name; saveCfg();
       outbox.file = []; tstat.file = {}; save(K.out, outbox);
       try { await idb.set('file', h); } catch {}
       dmsg('Saving…'); await sync(); fillDev();
       tstat.file?.err ? dmsg(tstat.file.err === 'perm' ? 'The app needs permission to edit that file.' : tstat.file.err, 'err')
-                      : dmsg(`Done. All ${local.length} entries are in ${h.name}, and every new tap is saved there too.`, 'ok');
+                      : (dmsg(`✓ All ${local.length} entries are in ${h.name}.`, 'ok'), go('done'));
     } catch (e) { if (e.name !== 'AbortError') dmsg(e.message || 'Could not use that file', 'err'); }
   };
   $('#devNew').onclick = () => linkFile(true);
   $('#devOpen').onclick = () => linkFile(false);
   $('#devUnlink').onclick = async () => {
-    fileHandle = null; filePerm = 'granted'; cfg.fileName = ''; save(K.cfg, cfg);
+    fileHandle = null; filePerm = 'granted'; cfg.fileName = ''; saveCfg();
     delete outbox.file; delete tstat.file; save(K.out, outbox); save(K.tstat, tstat);
     try { await idb.del('file'); } catch {}
     fillDev(); refreshPlaces(); setStatus(); renderBanner(); dmsg('Unlinked. The file is untouched, and every entry is still in the app.');
@@ -1190,8 +1282,8 @@ function init() {
     try {
       if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); }
       else download(name, file);
-      copySaved(); fillDev(); dmsg('Copy saved.', 'ok');
-    } catch (e) { if (e.name !== 'AbortError') dmsg(e.message, 'err'); }
+      copySaved(); fillDev(); cmsg('✓ Copy saved.', 'ok');
+    } catch (e) { if (e.name !== 'AbortError') cmsg(e.message, 'err'); }
   };
 
   // step 2: GitHub
@@ -1213,7 +1305,7 @@ function init() {
     const was = connected();
     Object.assign(cfg, { owner: $('#sOwner').value.trim().replace(/^@/, ''), repo: $('#sRepo').value.trim(), branch: $('#sBranch').value.trim(),
       path: $('#sPath').value.trim().replace(/^\/+/, '') || 'gut-check.csv', token: $('#sToken').value.trim() });
-    save(K.cfg, cfg); branchOk = false;
+    saveCfg(); branchOk = false;
     if (!connected()) return msg('Fill in your GitHub username, the repository name and the access key.', 'err');
     if (!was) outbox.github = [];
     tstat.github = {}; save(K.out, outbox);
@@ -1221,7 +1313,7 @@ function init() {
     tstat.github?.err ? msg(tstat.github.err, 'err') : msg(`Connected. All ${local.length} entries are backed up on GitHub, and every new tap is too.`, 'ok');
   };
   $('#setDisconnect').onclick = () => {
-    cfg.token = ''; save(K.cfg, cfg); delete outbox.github; delete tstat.github; save(K.out, outbox); save(K.tstat, tstat);
+    cfg.token = ''; saveCfg(); delete outbox.github; delete tstat.github; save(K.out, outbox); save(K.tstat, tstat);
     fillGh(); refreshPlaces(); setStatus(); renderBanner(); msg('Disconnected. Nothing was deleted on GitHub, and every entry is still in the app.');
   };
 
@@ -1232,33 +1324,41 @@ function init() {
   const loadGsCode = () => gsCode ? null : fetch('google-sheet/Code.gs', { cache: 'no-store' }).then(r => r.text())
     .then(t => { gsCode = t.replace(/const APP_URL = '[^']*';/, `const APP_URL = '${appUrl()}';`); }).catch(() => {});
   function fillGs() {
-    $('#gsState').innerHTML = gsConnected() ? '✓ Saving to the Google Sheet.' : '';
+    $('#gsState').innerHTML = gsConnected() ? '✓ This phone is saving to the Google Sheet.' : '';
     $('#gsDisconnect').hidden = !gsConnected();
     loadGsCode();
   }
   $('#gsCopy').onclick = async () => { // the code is fetched ahead of time so the copy happens inside this tap (Safari needs that)
-    try { if (!gsCode) await loadGsCode(); await navigator.clipboard.writeText(gsCode); gsmsg('Script copied. Paste it into Apps Script.', 'ok'); }
-    catch { gsmsg("Couldn't copy automatically. Use “view it” and copy all the text by hand.", 'err'); }
+    const m = (t, c) => { const el = $('#gsCopyMsg'); el.textContent = t; el.className = 'set-msg ' + c; };
+    try { if (!gsCode) await loadGsCode(); await navigator.clipboard.writeText(gsCode); m('✓ Copied! Now paste it in the Sheet.', 'ok'); $('#gsCopy').textContent = '✓ Copied'; }
+    catch { m("Couldn't copy by itself. Tap “See it”, select all the text and copy it.", 'err'); }
   };
   async function connectSheet(link) {
     const c = parseConnLink(link);
     if (!c) return gsmsg('That doesn\'t look like a Gut Check connection link. In the Sheet use Gut Check → Get connection link, and copy the whole link.', 'err');
-    cfg.gsUrl = c.url; cfg.gsKey = c.key; save(K.cfg, cfg);
+    cfg.gsUrl = c.url; cfg.gsKey = c.key; saveCfg();
     outbox.gsheet = []; tstat.gsheet = {}; save(K.out, outbox);
     gsmsg('Connecting…'); await sync(); fillGs();
     if (tstat.gsheet?.err) gsmsg(tstat.gsheet.err, 'err');
-    else { gsmsg(`Connected. All ${local.length} entries are in the Google Sheet, and every new tap is too.`, 'ok'); $('#gsLink').value = ''; }
+    else { gsmsg(`✓ Connected. All ${local.length} entries are in the Google Sheet.`, 'ok'); $('#gsLink').value = ''; go('done'); }
   }
+  $('#gsPaste').onclick = async () => {
+    try {
+      const t = await navigator.clipboard.readText();
+      $('#gsLink').value = t;
+      parseConnLink(t) ? connectSheet(t) : gsmsg("That's not the Gut Check link yet. Copy it from the Sheet (step 🔗), then tap Paste again.", 'err');
+    } catch { gsmsg('Long-press the box below and choose Paste, then tap Connect.', 'err'); $('#gsLink').focus(); }
+  };
   $('#gsConnect').onclick = () => connectSheet($('#gsLink').value);
   $('#gsDisconnect').onclick = () => {
-    cfg.gsUrl = ''; cfg.gsKey = ''; save(K.cfg, cfg); delete outbox.gsheet; delete tstat.gsheet; save(K.out, outbox); save(K.tstat, tstat);
+    cfg.gsUrl = ''; cfg.gsKey = ''; saveCfg(); delete outbox.gsheet; delete tstat.gsheet; save(K.out, outbox); save(K.tstat, tstat);
     fillGs(); refreshPlaces(); setStatus(); renderBanner(); gsmsg('Disconnected. Nothing in the Sheet was deleted, and every entry is still in the app.');
   };
   // opening the connection link itself (e.g. tapped in an email) connects too, after asking
   function connectFromHash() {
     if (!/gsheet=/.test(location.hash)) return;
     const link = location.hash; history.replaceState(null, '', location.pathname + location.search);
-    if (confirm('Connect Gut Check to your Google Sheet? Every entry will be saved there too.')) { openWizard(2); connectSheet(link); }
+    if (confirm('Connect Gut Check to your Google Sheet? Every entry will be saved there too.')) { openWizard('g7'); connectSheet(link); }
   }
 
   // step 3: bring in data
@@ -1286,16 +1386,34 @@ function init() {
 
   setTab(ui.tab);
   // reopen the linked phone file (if any) before the first save, so nothing lands in the wrong place
-  (FS_OK ? idb.get('file').catch(() => null) : Promise.resolve(null)).then(async h => {
+  let firstVisit = false, restoredN = 0;
+  const recall = async () => {
+    try {
+      if (!localStorage.getItem(K.cfg)) { // setup forgotten here, but maybe remembered in IndexedDB
+        const c = await idb.get('mem:cfg');
+        if (c) { cfg = Object.assign(defaultCfg(), c); save(K.cfg, cfg); for (const t of targets()) outbox[t] = outbox[t] || []; save(K.out, outbox); }
+      }
+      if (FRESH && !local.length) { // log wiped from localStorage: take back the newest daily backup, if any
+        const daily = (await listBackups()).find(b => /^bk:\d/.test(b.k));
+        if (daily && daily.list.length) { local = daily.list.map(fixEv); save(K.snap, local); restoredN = local.length; }
+      }
+      const seen = load('gl.seen', false) || !!(await idb.get('mem:seen'));
+      firstVisit = FRESH && !seen && !local.length && !targets().length;
+    } catch { firstVisit = FRESH && !local.length && !targets().length; }
+  };
+  recall().then(() => FS_OK ? idb.get('file').catch(() => null) : null).then(async h => {
     if (h) {
       fileHandle = h;
-      if (!cfg.fileName) { cfg.fileName = h.name; save(K.cfg, cfg); outbox.file = outbox.file || []; save(K.out, outbox); }
+      if (!cfg.fileName) { cfg.fileName = h.name; saveCfg(); outbox.file = outbox.file || []; save(K.out, outbox); }
       try { filePerm = await permOf(h, false); } catch { filePerm = 'prompt'; }
       if (filePerm !== 'granted') tstat.file = { ...(tstat.file || {}), err: 'perm', errAt: tstat.file?.errAt || Date.now() };
     } else if (cfg.fileName) {
       tstat.file = { ...(tstat.file || {}), err: 'The link to the file was lost. Link it again in Settings → Set up saving & backups.', errAt: tstat.file?.errAt || Date.now() };
     }
-    render(); scheduleSync(50); scheduleBackup(); connectFromHash();
+    render(); scheduleSync(50); scheduleBackup();
+    if (restoredN) toast(`Welcome back: ${restoredN} entries restored from the app's backup`);
+    if (/gsheet=/.test(location.hash)) connectFromHash();
+    else if (firstVisit) openWizard('welcome');
   });
 }
 init();
