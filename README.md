@@ -1,4 +1,4 @@
-# Gut Log
+# Gut Check
 
 A tiny, phone-first tracker for bowel movements (Bristol stool scale 1–7), **MiraLAX** and **Gas-X**.
 
@@ -15,7 +15,7 @@ No build step and no server. It's plain HTML, CSS and JS served by GitHub Pages.
 ## Where the data lives
 
 This repo only holds the **app**, and it can be public. The log is stored in a **separate private repo**
-(default name `gut-log-data`), in a file called `gut-log.csv`. Excel, Numbers and Google Sheets all open it directly.
+(default name `gut-check-data`), in a file called `gut-check.csv`. Excel, Numbers and Google Sheets all open it directly.
 The app checks the data repo before every session and **refuses to save to a public repo**.
 
 | id | timestamp | date | time | weekday | event | bristol_type | bristol_description |
@@ -31,11 +31,11 @@ The app checks the data repo before every session and **refuses to save to a pub
 
 1. **Site:** in this repo, open **Settings → Pages → Deploy from a branch → `main` / root**.
    The site is at `https://<owner>.github.io/<repo>/`.
-2. **Data repo:** create a new **private** repo named `gut-log-data` at <https://github.com/new>.
+2. **Data repo:** create a new **private** repo named `gut-check-data` at <https://github.com/new>.
    Ticking "Add a README" is fine; the app creates the CSV itself.
 3. **Token:** at <https://github.com/settings/personal-access-tokens/new>, create a **fine-grained** token with
-   repository access **Only select repositories → `gut-log-data`** and permission **Contents → Read and write**.
-4. **Phone:** open the site, tap ⚙️, check that Owner is right and Private repo says `gut-log-data`, paste the token,
+   repository access **Only select repositories → `gut-check-data`** and permission **Contents → Read and write**.
+4. **Phone:** open the site, tap ⚙️, check that Owner is right and Private repo says `gut-check-data`, paste the token,
    and tap **Save & connect**. Then use **Share → Add to Home Screen**. The token is stored only on that phone.
 
 ## Files

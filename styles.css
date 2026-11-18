@@ -39,7 +39,7 @@ button { cursor: pointer; }
 
 /* Header */
 .top { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.brand { font-size: 19px; font-weight: 700; letter-spacing: -.01em; margin: 0; display: flex; align-items: center; gap: 8px; flex: 1; }
+.brand { font-size: 19px; font-weight: 700; letter-spacing: -.01em; margin: 0; display: flex; align-items: center; gap: 8px; flex: 1; white-space: nowrap; }
 .brand-mark { width: 22px; height: 22px; display: inline-block; background: url(icon.svg) center/contain no-repeat; }
 .icon-btn { background: none; border: 0; padding: 8px; border-radius: 10px; color: var(--text-2); display: grid; place-items: center; }
 .icon-btn:active { background: var(--surface-2); }
@@ -104,7 +104,7 @@ button { cursor: pointer; }
 .primary { background: var(--text); color: var(--bg); border-color: var(--text); }
 .danger { background: none; color: #ff8a80; border-color: #5a2a28; }
 .wide { width: 100%; }
-.grow { flex: 1; }
+.grow { flex: 1; white-space: nowrap; }
 
 /* Recent */
 .recent { margin-top: 18px; }

@@ -1,6 +1,6 @@
 {
-  "name": "Gut Log",
-  "short_name": "Gut Log",
+  "name": "Gut Check",
+  "short_name": "Gut Check",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -1,4 +1,4 @@
-/* Gut Log: a tiny tracker for bowel movements, MiraLAX and Gas-X.
+/* Gut Check: a tiny tracker for bowel movements, MiraLAX and Gas-X.
  * Data lives in a CSV file in a GitHub repo (Excel opens it directly).
  * Writes go through the GitHub Contents API with a token kept on the device.
  * Every change is queued locally first, so taps never get lost offline. */
@@ -97,7 +97,7 @@ let ui = Object.assign({ tab: 'home', range: 14, hf: 'all' }, load(K.ui, {}));
 
 function defaultCfg() {
   const h = location.hostname, gh = h.endsWith('.github.io');
-  return { owner: gh ? h.split('.')[0] : '', repo: 'gut-log-data', branch: '', path: 'gut-log.csv', token: '' };
+  return { owner: gh ? h.split('.')[0] : '', repo: 'gut-check-data', branch: '', path: 'gut-check.csv', token: '' };
 }
 const connected = () => !!(cfg.owner && cfg.repo && cfg.token && cfg.path);
 
@@ -225,7 +225,7 @@ async function fetchRemote() {
   return { sha: j.sha, list: rowsToEntries(parseDelimited(text)) };
 }
 function commitMsg(ops) {
-  if (ops.length > 1) return `Gut Log: ${ops.length} changes`;
+  if (ops.length > 1) return `Gut Check: ${ops.length} changes`;
   const o = ops[0];
   if (o.op === 'add') return `Log ${EV[o.e.ev].label}${o.e.b ? ` (type ${o.e.b})` : ''} ${dayKey(o.e.ts)} ${hm(o.e.ts)}`;
   return o.op === 'del' ? 'Remove an entry' : 'Edit an entry';
@@ -266,7 +266,7 @@ function setStatus(s) {
   const btn = $('#syncBtn'), t = $('#syncText');
   if (!s) s = !connected() ? 'local' : lastErr ? 'err' : pending.length ? 'pending' : 'ok';
   btn.dataset.s = s;
-  t.textContent = { local: 'This phone only', busy: 'Saving…', pending: `${pending.length} to save`, err: 'Not saved', ok: 'Saved' }[s];
+  t.textContent = { local: 'Phone only', busy: 'Saving…', pending: `${pending.length} to save`, err: 'Not saved', ok: 'Saved' }[s];
   btn.title = lastErr || '';
 }
 
@@ -310,7 +310,7 @@ function renderKpis(list) {
   const delta = hasPrev && prev.n ? cur.perDay - prev.perDay : NaN;
   const trend = isFinite(delta) && Math.abs(delta) >= .05 ? `<span class="${delta > 0 ? 'up' : 'down'}">${Math.abs(delta).toFixed(1)}</span> vs last wk` : 'last 7 days';
   $('#kpis').innerHTML = `
-    <div class="kpi"><div class="kpi-label">Poops / day</div><div class="kpi-val">${list.length ? cur.perDay.toFixed(1) : '–'}</div><div class="kpi-sub">${trend}</div></div>
+    <div class="kpi"><div class="kpi-label">Per day</div><div class="kpi-val">${list.length ? cur.perDay.toFixed(1) : '–'}</div><div class="kpi-sub">${trend}</div></div>
     <div class="kpi"><div class="kpi-label">Avg type</div><div class="kpi-val">${isFinite(cur.type) ? cur.type.toFixed(1) : '–'}<small>/7</small></div><div class="kpi-sub">${isFinite(cur.type) ? typeLabel(cur.type) : 'Bristol scale'}</div></div>
     <div class="kpi"><div class="kpi-label">Between</div><div class="kpi-val">${fmtDur(cur.gap)}</div><div class="kpi-sub">${lastPoop ? `last ${ago(lastPoop.ts)}` : 'avg gap'}</div></div>`;
 }
@@ -694,7 +694,7 @@ function init() {
   $('#setSave').onclick = async () => {
     const wasLocal = !connected();
     cfg = { owner: $('#sOwner').value.trim(), repo: $('#sRepo').value.trim(), branch: $('#sBranch').value.trim(),
-      path: $('#sPath').value.trim().replace(/^\/+/, '') || 'gut-log.csv', token: $('#sToken').value.trim() };
+      path: $('#sPath').value.trim().replace(/^\/+/, '') || 'gut-check.csv', token: $('#sToken').value.trim() };
     save(K.cfg, cfg); branchOk = false;
     if (!connected()) return msg('Fill in owner, repository and token.', 'err');
     // entries logged before connecting get uploaded too
@@ -706,14 +706,14 @@ function init() {
     snapshot = entries(); pending = []; save(K.snap, snapshot); save(K.pend, pending);
     cfg.token = ''; save(K.cfg, cfg); lastErr = ''; fill(); msg('Disconnected. Entries stay on this phone.'); render();
   };
-  $('#expCsv').onclick = () => download(`gut-log-${dayKey(Date.now())}.csv`, new Blob(['﻿' + toCSV(entries())], { type: 'text/csv' }));
+  $('#expCsv').onclick = () => download(`gut-check-${dayKey(Date.now())}.csv`, new Blob(['﻿' + toCSV(entries())], { type: 'text/csv' }));
   $('#expXlsx').onclick = async () => {
     try {
       const X = await loadXLSX(), list = entries();
       const ws = X.utils.aoa_to_sheet([CSV_HEAD, ...toRows(list)]);
       ws['!cols'] = [10, 26, 12, 7, 8, 10, 12, 48].map(w => ({ wch: w }));
       const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Log');
-      download(`gut-log-${dayKey(Date.now())}.xlsx`, new Blob([X.write(wb, { type: 'array', bookType: 'xlsx' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      download(`gut-check-${dayKey(Date.now())}.xlsx`, new Blob([X.write(wb, { type: 'array', bookType: 'xlsx' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
     } catch (e) { msg(e.message, 'err'); }
   };
   $('#impFile').onchange = async e => {
