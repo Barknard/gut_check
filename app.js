@@ -665,18 +665,19 @@ function setTab(t) {
 }
 
 /* ---------- logging ---------- */
-let toastTimer = 0, undoIds = [];
-function toast(msg, ids) {
-  undoIds = ids || [];
-  $('#toastText').textContent = msg; $('#toastUndo').hidden = !undoIds.length;
+let toastTimer = 0, undoFn = null;
+function toast(msg, undo = null, ms = 5000) {
+  undoFn = undo;
+  $('#toastText').textContent = msg; $('#toastUndo').hidden = !undoFn;
   const t = $('#toast'); t.hidden = true; void t.offsetWidth; t.hidden = false;
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 5000);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; undoFn = null; }, ms);
 }
+const delOne = e => { queue({ op: 'del', id: e.id }); toast('Entry deleted', () => queue({ op: 'add', e })); };
 function log(ev, b = null, ts = Date.now()) {
   const e = { id: newId(), ts, ev, b };
   queue({ op: 'add', e }); buzz();
   const btn = $(`.act[data-act="${ev}"]`); btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop');
-  toast(ev === 'poop' ? `💩 Type ${b} logged${ts < Date.now() - MIN ? ` at ${fmtTime(ts)}` : ''}` : `${EMOJI[ev]} ${EV[ev].label} logged at ${fmtTime(ts)}`, [e.id]);
+  toast(ev === 'poop' ? `💩 Type ${b} logged${ts < Date.now() - MIN ? ` at ${fmtTime(ts)}` : ''}` : `${EMOJI[ev]} ${EV[ev].label} logged at ${fmtTime(ts)}`, () => queue({ op: 'del', id: e.id }));
 }
 let pickAgo = 0;
 function openPicker() {
@@ -764,7 +765,7 @@ function init() {
   $('#bristolGrid').onclick = e => { const b = e.target.closest('.b-opt'); if (!b) return; log('poop', +b.dataset.b, Date.now() - pickAgo * MIN); closePicker(); };
   $('#when').onclick = e => { const c = e.target.closest('.chip'); if (!c) return; pickAgo = +c.dataset.ago; $$('#when .chip').forEach(x => x.classList.toggle('is-on', x === c)); };
   $('#pickCancel').onclick = closePicker;
-  $('#toastUndo').onclick = () => { if (undoIds.length) queue(...undoIds.map(id => ({ op: 'del', id }))); undoIds = []; $('#toast').hidden = true; toast('Removed'); };
+  $('#toastUndo').onclick = () => { const f = undoFn; undoFn = null; $('#toast').hidden = true; if (f) { f(); toast('Undone'); } };
 
   $('#histFilter').onclick = e => { const c = e.target.closest('.chip'); if (!c) return; ui.hf = c.dataset.f; save(K.ui, ui); $$('#histFilter .chip').forEach(x => x.classList.toggle('is-on', x === c)); render(); };
   $$('#histFilter .chip').forEach(x => x.classList.toggle('is-on', x.dataset.f === ui.hf));
@@ -772,7 +773,7 @@ function init() {
     const row = e.target.closest('.row'); if (!row) return;
     const del = e.target.closest('[data-del]');
     if (del) {
-      if (armedDelete === row.dataset.id) { queue({ op: 'del', id: row.dataset.id }); armedDelete = null; toast('Entry deleted'); return; }
+      if (armedDelete === row.dataset.id) { const e = entries().find(x => x.id === row.dataset.id); armedDelete = null; if (e) delOne(e); return; }
       $$('.row-del.confirm').forEach(b => { b.classList.remove('confirm'); b.innerHTML = del.innerHTML; });
       armedDelete = row.dataset.id; del.classList.add('confirm'); del.textContent = 'Delete?';
       setTimeout(() => { if (armedDelete === row.dataset.id) { armedDelete = null; render(); } }, 3000);
@@ -785,7 +786,7 @@ function init() {
   $$('#range .chip').forEach(x => x.classList.toggle('is-on', +x.dataset.r === ui.range));
 
   $('#editCancel').onclick = () => $('#editDlg').close();
-  $('#editDelete').onclick = () => { if (editing) queue({ op: 'del', id: editing.id }); $('#editDlg').close(); toast('Entry deleted'); };
+  $('#editDelete').onclick = () => { if (editing) delOne(editing); $('#editDlg').close(); };
   $('#editDlg').querySelector('form').onsubmit = ev => {
     const ts = new Date($('#editWhen').value).getTime();
     if (!editing || isNaN(ts)) return;
@@ -796,6 +797,21 @@ function init() {
   // settings
   const fill = () => { $('#sOwner').value = cfg.owner; $('#sRepo').value = cfg.repo; $('#sBranch').value = cfg.branch; $('#sPath').value = cfg.path; $('#sToken').value = cfg.token; };
   const msg = (t, c = '') => { const m = $('#setMsg'); m.textContent = t; m.className = 'set-msg ' + c; };
+  // reset: deletes every entry everywhere it is saved (as delete ops, so file/GitHub stay in step), with a 10s undo
+  $('#resetOpen').onclick = () => {
+    const all = entries(); if (!all.length) return msg('There is nothing to delete.');
+    const n = ev => all.filter(e => e.ev === ev).length;
+    const where = backend() === 'file' ? ` and from <b>${esc(fileHandle.name)}</b>` : backend() === 'github' ? ` and from <b>${esc(cfg.repo)}/${esc(cfg.path)}</b> on GitHub` : '';
+    $('#resetText').innerHTML = `This permanently deletes all <b>${all.length}</b> entries (${n('poop')} poop, ${n('vomit')} vomit, ${n('miralax')} MiraLAX, ${n('gasx')} Gas-X) from this phone${where}. Settings are kept.`;
+    $('#resetDlg').showModal();
+  };
+  $('#resetBackup').onclick = async () => { try { download(`gut-check-backup-${dayKey(Date.now())}.xlsx`, await xlsxBlob(entries())); } catch { download(`gut-check-backup-${dayKey(Date.now())}.csv`, new Blob([toCSV(entries())], { type: 'text/csv' })); } };
+  $('#resetGo').onclick = () => {
+    const all = entries();
+    queue(...all.map(e => ({ op: 'del', id: e.id })));
+    $('#resetDlg').close(); $('#setDlg').close(); setTab('home');
+    toast(`🧹 Deleted all ${all.length} entries`, () => queue(...all.map(e => ({ op: 'add', e }))), 10000);
+  };
   const dmsg = (t, c = '') => { const m = $('#devMsg'); m.textContent = t; m.className = 'set-msg ' + c; };
   const fillDev = () => {
     $('#devYes').hidden = !FS_OK; $('#devNo').hidden = FS_OK; $('#devUnlink').hidden = !fileHandle;

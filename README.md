@@ -5,7 +5,8 @@ A tiny, phone-first tracker for bowel movements (Bristol stool scale 1–7), **v
 - **Log tab:** three KPIs (poops/day, average stool type, time between poops) and four big buttons.
   Tap **Poop** to pick a Bristol type (with a "15m / 30m / 1h ago" option), or tap Vomit or a medicine to log it instantly.
   Every log shows an **Undo** toast.
-- **History tab:** every entry, grouped by day. Tap a row to change its time or type; tap the trash icon twice to delete it.
+- **History tab:** every entry, grouped by day. Tap a row to change its time or type; tap the trash icon twice to delete it (with Undo).
+- **Start over:** ⚙️ → **Delete all entries…** asks for confirmation (with a "download a backup first" button), deletes everything wherever it's saved, and offers Undo for 10 seconds. Settings are kept.
 - **Details tab:** pattern sentences (e.g. *"After MiraLAX, the next poop typically comes 3h 50m later"*), plus charts for
   poops per day with medicine doses, stool type over time, type mix, medicine timing (before / during / after a poop),
   vomiting (how often, and how often it follows MiraLAX or Gas-X), time of day, and weekly averages.
@@ -49,6 +50,10 @@ Only needed for the GitHub option. The phone-file option needs no setup beyond p
    repository access **Only select repositories → `gut-check-data`** and permission **Contents → Read and write**.
 4. **Phone:** open the site, tap ⚙️, check that Owner is right and Private repo says `gut-check-data`, paste the token,
    and tap **Save & connect**. Then use **Share → Add to Home Screen**. The token is stored only on that phone.
+
+## App icon not showing?
+
+Phones save the home-screen icon when the shortcut is first added and don't refresh it. If the shortcut was added before the site was working, or before the icon was updated, it keeps a generic icon. Remove the shortcut from the home screen, open the site in Safari or Chrome, refresh, and add it to the home screen again.
 
 ## Files
 

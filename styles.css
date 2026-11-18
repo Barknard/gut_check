@@ -104,6 +104,9 @@ button { cursor: pointer; }
 .ghost, .primary, .danger { border-radius: 12px; padding: 10px 14px; font-weight: 600; border: 1px solid var(--border); background: var(--surface-2); }
 .primary { background: var(--text); color: var(--bg); border-color: var(--text); }
 .danger { background: none; color: #ff8a80; border-color: #5a2a28; }
+.danger.solid { background: #b3261e; color: #fff; border-color: #b3261e; }
+.danger-zone { border-color: #5a2a28 !important; }
+.reset-text { margin: 0; font-size: 14.5px; line-height: 1.5; }
 .wide { width: 100%; }
 .grow { flex: 1; white-space: nowrap; }
 
