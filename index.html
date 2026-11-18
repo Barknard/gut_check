@@ -113,9 +113,26 @@
 <dialog id="setDlg">
   <form method="dialog" class="dlg" id="setForm">
     <h2>Settings</h2>
-    <p class="hint">Entries are saved as a CSV file (Excel opens it) in a <b>private</b> GitHub repo. The app won't save to a public repo. Set this up once on each phone.</p>
+    <p class="hint">Entries are always kept inside the app on this phone. You can also save them to a spreadsheet file on the phone, or to a private GitHub repo so they're backed up and other phones can use them. Pick one.</p>
     <fieldset>
-      <legend>Save to GitHub</legend>
+      <legend>Save to a file on this phone</legend>
+      <div id="devYes">
+        <p class="set-line" id="devState">No file linked yet.</p>
+        <div class="dlg-row wrap">
+          <button type="button" class="primary" id="devNew">Create new file…</button>
+          <button type="button" class="ghost" id="devOpen">Use existing file…</button>
+          <button type="button" class="ghost" id="devUnlink">Unlink</button>
+        </div>
+        <p class="hint">Choose any folder, e.g. Downloads, Documents or Google Drive. Every tap is saved straight into that file, and the app reads it again whenever it opens, so changes made in Excel show up too. End the name in <b>.xlsx</b> for an Excel file or <b>.csv</b> for a plain one. If "Create new file" won't save, pick an existing spreadsheet with "Use existing file" instead.</p>
+      </div>
+      <div id="devNo" hidden>
+        <p class="hint">This browser can't stay linked to a file. iPhone and iPad don't allow that for any website. Tap <b>Save copy to Files</b> and choose a folder (On My iPhone, iCloud Drive…), and use <b>Import file</b> below to read a copy back in.</p>
+        <div class="dlg-row wrap"><button type="button" class="primary" id="devShare">Save copy to Files</button></div>
+      </div>
+      <span id="devMsg" class="set-msg"></span>
+    </fieldset>
+    <fieldset>
+      <legend>Or save to GitHub</legend>
       <div class="two">
         <label>Owner<input id="sOwner" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
         <label>Private repo<input id="sRepo" autocomplete="off" autocapitalize="off" spellcheck="false"></label>

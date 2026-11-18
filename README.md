@@ -14,20 +14,32 @@ No build step and no server. It's plain HTML, CSS and JS served by GitHub Pages.
 
 ## Where the data lives
 
-This repo only holds the **app**, and it can be public. The log is stored in a **separate private repo**
-(default name `gut-check-data`), in a file called `gut-check.csv`. Excel, Numbers and Google Sheets all open it directly.
-The app checks the data repo before every session and **refuses to save to a public repo**.
+Entries are always kept inside the app on the phone. On top of that, **Settings (⚙️)** offers one of two places to save:
+
+**1. A spreadsheet file on the phone**: Android (Chrome) and computers (Chrome or Edge)
+- Tap **Create new file…** or **Use existing file…** and pick any folder: Downloads, Documents, Google Drive and so on.
+- After that, every tap is written straight into that file. The app re-reads it each time it opens, so edits made in Excel show up too.
+- Name it **`.xlsx`** for a real Excel file or **`.csv`** for a plain one.
+- After a while Chrome may ask again. The badge at the top then says **Tap to reconnect**; one tap restores access. Entries made in the meantime wait in the app and are written on reconnect.
+- **iPhone and iPad can't do this.** Apple doesn't let any website stay linked to a file. On iPhone the same box shows **Save copy to Files**, which saves a copy into a folder she chooses. **Import file…** reads a copy back in.
+
+**2. A private GitHub repo**: backed up, and several phones can share one log
+- The log is stored as `gut-check.csv` in a **separate private repo** (default name `gut-check-data`).
+- The app **refuses to save to a public repo**.
+
+Both use the same columns:
 
 | id | timestamp | date | time | weekday | event | bristol_type | bristol_description |
 |---|---|---|---|---|---|---|---|
 | mwl…| 2026-11-18T08:12:00-05:00 | 2026-11-18 | 08:12 | Wed | Poop | 4 | Like a sausage or snake, smooth and soft |
 
-- Logging works offline too: entries queue on the phone and save when the connection returns.
-- Two phones can log to the same file. If both save at the same moment, the app reloads the file and merges the entries instead of overwriting.
-- **Settings → Download Excel / Download CSV** exports everything.
+- Two phones can log to the same GitHub file. If both save at the same moment, the app reloads the file and merges the entries instead of overwriting.
+- **Settings → Download Excel / Download CSV** exports everything at any time.
   **Import file…** reads `.xlsx`, `.csv` or `.txt` files and skips duplicate rows.
 
 ## Setup
+
+Only needed for the GitHub option. The phone-file option needs no setup beyond picking the file.
 
 1. **Site:** in this repo, open **Settings → Pages → Deploy from a branch → `main` / root**.
    The site is at `https://<owner>.github.io/<repo>/`.
@@ -43,8 +55,8 @@ The app checks the data repo before every session and **refuses to save to a pub
 ```
 index.html            page structure
 styles.css            dark, colorblind-safe theme
-app.js                logging, GitHub sync, stats and charts (no dependencies;
-                      the Excel library loads from cdnjs only for .xlsx import/export)
+app.js                logging, saving (phone file or GitHub), stats and charts
+vendor/xlsx.*         SheetJS 0.18.5 (Apache-2.0), loaded only when an Excel file is used
 manifest.webmanifest  "Add to Home Screen" support
 icon.svg, icon-*.png  app icon
 ```

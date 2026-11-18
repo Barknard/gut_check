@@ -131,7 +131,7 @@ const entries = () => applyOps(snapshot, pending);
 
 function queue(...ops) {
   pending.push(...ops); save(K.pend, pending);
-  if (!connected()) { snapshot = entries(); pending = []; save(K.snap, snapshot); save(K.pend, pending); }
+  if (!backend()) { snapshot = entries(); pending = []; save(K.snap, snapshot); save(K.pend, pending); }
   render(); scheduleSync();
 }
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -249,31 +249,82 @@ function commitMsg(ops) {
   return o.op === 'del' ? 'Remove an entry' : 'Edit an entry';
 }
 
+/* ---------- device file (File System Access: Chrome on Android, Chrome/Edge on computers) ----------
+ * The person picks a file anywhere on the device once; we keep the handle in IndexedDB and
+ * read + rewrite that same file on every change. iPhone Safari has no equivalent API. */
+const FS_OK = 'showSaveFilePicker' in window || 'showOpenFilePicker' in window;
+let fileHandle = null, filePerm = 'granted';
+const idb = (() => {
+  let p;
+  const db = () => p || (p = new Promise((res, rej) => {
+    const r = indexedDB.open('gutcheck', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  }));
+  const tx = async (mode, fn) => { const d = await db(); return new Promise((res, rej) => {
+    const t = d.transaction('kv', mode), q = fn(t.objectStore('kv'));
+    t.oncomplete = () => res(q.result); t.onerror = () => rej(t.error);
+  }); };
+  return { get: k => tx('readonly', st => st.get(k)), set: (k, v) => tx('readwrite', st => st.put(v, k)), del: k => tx('readwrite', st => st.delete(k)) };
+})();
+const backend = () => fileHandle ? 'file' : connected() ? 'github' : null;
+const isXlsx = h => /\.xlsx$/i.test(h.name);
+async function permOf(h, ask) {
+  const m = ask ? h.requestPermission : h.queryPermission;
+  return m ? m.call(h, { mode: 'readwrite' }) : 'granted';
+}
+async function readDeviceFile() {
+  const f = await fileHandle.getFile();
+  if (!f.size) return null; // brand-new (or truncated) file
+  if (isXlsx(fileHandle)) {
+    const X = await loadXLSX(), wb = X.read(await f.arrayBuffer(), { cellDates: true });
+    return rowsToEntries(X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, dateNF: 'yyyy-mm-dd hh:mm' }));
+  }
+  return rowsToEntries(parseDelimited(await f.text()));
+}
+async function syncFile() {
+  filePerm = await permOf(fileHandle, false);
+  if (filePerm !== 'granted') throw new Error('Tap “Tap to reconnect” to let the app use the file again.');
+  const read = await readDeviceFile();
+  const ops = pending.slice();
+  const merged = applyOps(read === null ? snapshot : read, ops); // empty file: start from what this phone knows
+  if (ops.length || read === null) {
+    const data = isXlsx(fileHandle) ? await xlsxBlob(merged) : new Blob([toCSV(merged)], { type: 'text/csv' });
+    const w = await fileHandle.createWritable(); await w.write(data); await w.close();
+  }
+  snapshot = merged; pending = pending.slice(ops.length);
+}
+// Switching where entries live: hand everything to the new place as adds (merged by id there).
+function carryOver() { pending = entries().map(e => ({ op: 'add', e })); snapshot = []; save(K.pend, pending); save(K.snap, snapshot); }
+
 let syncing = false, again = false, syncTimer = 0, branchOk = false, lastErr = '';
 function scheduleSync(ms = 1200) { clearTimeout(syncTimer); syncTimer = setTimeout(sync, ms); }
+async function syncGithub() {
+  if (!branchOk) { await checkRepo(); branchOk = true; }
+  for (let attempt = 0; ; attempt++) {
+    const { sha, list } = await fetchRemote();
+    const ops = pending.slice();
+    if (!ops.length) { snapshot = list; break; }
+    const merged = applyOps(list, ops);
+    const body = { message: commitMsg(ops), content: b64enc(toCSV(merged)) };
+    if (activeBranch) body.branch = activeBranch;
+    if (sha) body.sha = sha;
+    const r = await api(`/contents/${filePath()}`, { method: 'PUT', body: JSON.stringify(body) });
+    if (r.ok) { snapshot = merged; pending = pending.slice(ops.length); break; }
+    if ((r.status === 409 || r.status === 422) && attempt < 4) continue; // someone else wrote first: refetch & reapply
+    throw new HttpError(r, r.status === 403 || r.status === 404 ? 'Token needs Contents: Read and write on this repo' : null);
+  }
+}
 async function sync() {
-  if (!connected()) return setStatus();
+  if (!backend()) return setStatus();
   if (syncing) { again = true; return; }
   syncing = true; setStatus('busy');
   try {
-    if (!branchOk) { await checkRepo(); branchOk = true; }
-    for (let attempt = 0; ; attempt++) {
-      const { sha, list } = await fetchRemote();
-      const ops = pending.slice();
-      if (!ops.length) { snapshot = list; break; }
-      const merged = applyOps(list, ops);
-      const body = { message: commitMsg(ops), content: b64enc(toCSV(merged)) };
-      if (activeBranch) body.branch = activeBranch;
-      if (sha) body.sha = sha;
-      const r = await api(`/contents/${filePath()}`, { method: 'PUT', body: JSON.stringify(body) });
-      if (r.ok) { snapshot = merged; pending = pending.slice(ops.length); break; }
-      if ((r.status === 409 || r.status === 422) && attempt < 4) continue; // someone else wrote first: refetch & reapply
-      throw new HttpError(r, r.status === 403 || r.status === 404 ? 'Token needs Contents: Read and write on this repo' : null);
-    }
+    await (backend() === 'file' ? syncFile() : syncGithub());
     save(K.snap, snapshot); save(K.pend, pending); lastErr = '';
     render();
   } catch (e) {
-    lastErr = navigator.onLine === false ? 'Offline: will sync later' : (e.message || 'Sync failed');
+    lastErr = backend() === 'github' && navigator.onLine === false ? 'Offline: will sync later' : (e.message || 'Could not save');
     branchOk = false;
   } finally {
     syncing = false; setStatus();
@@ -282,9 +333,9 @@ async function sync() {
 }
 function setStatus(s) {
   const btn = $('#syncBtn'), t = $('#syncText');
-  if (!s) s = !connected() ? 'local' : lastErr ? 'err' : pending.length ? 'pending' : 'ok';
+  if (!s) s = !backend() ? 'local' : fileHandle && filePerm !== 'granted' ? 'perm' : lastErr ? 'err' : pending.length ? 'pending' : 'ok';
   btn.dataset.s = s;
-  t.textContent = { local: 'Phone only', busy: 'Saving…', pending: `${pending.length} to save`, err: 'Not saved', ok: 'Saved' }[s];
+  t.textContent = { local: 'Phone only', busy: 'Saving…', pending: `${pending.length} to save`, err: 'Not saved', perm: 'Tap to reconnect', ok: fileHandle ? 'Saved to file' : 'Saved' }[s];
   btn.title = lastErr || '';
 }
 
@@ -652,10 +703,16 @@ let xlsxP = null;
 const loadXLSX = () => xlsxP || (xlsxP = new Promise((res, rej) => {
   if (window.XLSX) return res(window.XLSX);
   const s = document.createElement('script');
-  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  s.src = 'vendor/xlsx.full.min.js'; // SheetJS 0.18.5, bundled so Excel files work offline
   s.onload = () => res(window.XLSX); s.onerror = () => { xlsxP = null; rej(new Error('Could not load the Excel library')); };
   document.head.appendChild(s);
 }));
+async function xlsxBlob(list) {
+  const X = await loadXLSX(), ws = X.utils.aoa_to_sheet([CSV_HEAD, ...toRows(list)]);
+  ws['!cols'] = [10, 26, 12, 7, 8, 10, 12, 48].map(w => ({ wch: w }));
+  const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Log');
+  return new Blob([X.write(wb, { type: 'array', bookType: 'xlsx' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
 function download(name, blob) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
@@ -739,16 +796,53 @@ function init() {
   // settings
   const fill = () => { $('#sOwner').value = cfg.owner; $('#sRepo').value = cfg.repo; $('#sBranch').value = cfg.branch; $('#sPath').value = cfg.path; $('#sToken').value = cfg.token; };
   const msg = (t, c = '') => { const m = $('#setMsg'); m.textContent = t; m.className = 'set-msg ' + c; };
-  $('#settingsBtn').onclick = () => { fill(); msg(lastErr, lastErr ? 'err' : ''); $('#setDlg').showModal(); };
-  $('#syncBtn').onclick = () => connected() ? sync() : $('#settingsBtn').click();
+  const dmsg = (t, c = '') => { const m = $('#devMsg'); m.textContent = t; m.className = 'set-msg ' + c; };
+  const fillDev = () => {
+    $('#devYes').hidden = !FS_OK; $('#devNo').hidden = FS_OK; $('#devUnlink').hidden = !fileHandle;
+    $('#devState').innerHTML = fileHandle ? `Saving to <b>${esc(fileHandle.name)}</b>${filePerm !== 'granted' ? ' (needs permission again)' : ''}` : 'No file linked yet.';
+  };
+  $('#settingsBtn').onclick = () => { fill(); fillDev(); msg(backend() === 'github' ? lastErr : '', 'err'); dmsg(backend() === 'file' ? lastErr : '', 'err'); $('#setDlg').showModal(); };
+  $('#syncBtn').onclick = async () => {
+    if (fileHandle && filePerm !== 'granted') { try { filePerm = await permOf(fileHandle, true); } catch {} } // needs this tap
+    backend() ? sync() : $('#settingsBtn').click();
+  };
+  const linkFile = async create => {
+    const types = [{ description: 'Spreadsheet', accept: { 'text/csv': ['.csv'], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'] } }];
+    try {
+      const h = create ? await window.showSaveFilePicker({ suggestedName: 'gut-check.csv', types })
+                       : (await window.showOpenFilePicker({ types, multiple: false }))[0];
+      if (await permOf(h, true) !== 'granted') return dmsg('The app needs permission to edit that file.', 'err');
+      carryOver(); fileHandle = h; filePerm = 'granted'; lastErr = '';
+      try { await idb.set('file', h); } catch {}
+      dmsg('Saving…'); await sync(); fillDev();
+      lastErr ? dmsg(lastErr, 'err') : dmsg(`Linked · ${entries().length} entries in ${h.name}`, 'ok');
+    } catch (e) { if (e.name !== 'AbortError') dmsg(e.message || 'Could not use that file', 'err'); }
+  };
+  $('#devNew').onclick = () => linkFile(true);
+  $('#devOpen').onclick = () => linkFile(false);
+  $('#devUnlink').onclick = async () => {
+    const wasFile = !!fileHandle;
+    snapshot = entries(); pending = []; save(K.snap, snapshot); save(K.pend, pending);
+    fileHandle = null; filePerm = 'granted'; lastErr = ''; try { await idb.del('file'); } catch {}
+    if (wasFile && connected()) { carryOver(); scheduleSync(100); }
+    fillDev(); dmsg('Unlinked. The file is untouched, and entries stay in the app.'); render();
+  };
+  $('#devShare').onclick = async () => {
+    const name = `gut-check-${dayKey(Date.now())}.csv`, file = new File([toCSV(entries())], name, { type: 'text/csv' });
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); dmsg('Saved a copy.', 'ok'); }
+      else download(name, file);
+    } catch (e) { if (e.name !== 'AbortError') dmsg(e.message, 'err'); }
+  };
   $('#setSave').onclick = async () => {
-    const wasLocal = !connected();
+    const wasLocal = backend() !== 'github';
     cfg = { owner: $('#sOwner').value.trim(), repo: $('#sRepo').value.trim(), branch: $('#sBranch').value.trim(),
       path: $('#sPath').value.trim().replace(/^\/+/, '') || 'gut-check.csv', token: $('#sToken').value.trim() };
     save(K.cfg, cfg); branchOk = false;
     if (!connected()) return msg('Fill in owner, repository and token.', 'err');
-    // entries logged before connecting get uploaded too
-    if (wasLocal && snapshot.length) { pending = snapshot.map(e => ({ op: 'add', e })).concat(pending); snapshot = []; save(K.pend, pending); save(K.snap, snapshot); }
+    // GitHub replaces a linked phone file; everything logged so far gets uploaded too
+    if (fileHandle) { fileHandle = null; try { await idb.del('file'); } catch {} }
+    if (wasLocal) carryOver();
     msg('Connecting…'); await sync();
     lastErr ? msg(lastErr, 'err') : msg(`Connected · ${entries().length} entries`, 'ok');
   };
@@ -758,13 +852,7 @@ function init() {
   };
   $('#expCsv').onclick = () => download(`gut-check-${dayKey(Date.now())}.csv`, new Blob(['﻿' + toCSV(entries())], { type: 'text/csv' }));
   $('#expXlsx').onclick = async () => {
-    try {
-      const X = await loadXLSX(), list = entries();
-      const ws = X.utils.aoa_to_sheet([CSV_HEAD, ...toRows(list)]);
-      ws['!cols'] = [10, 26, 12, 7, 8, 10, 12, 48].map(w => ({ wch: w }));
-      const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Log');
-      download(`gut-check-${dayKey(Date.now())}.xlsx`, new Blob([X.write(wb, { type: 'array', bookType: 'xlsx' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-    } catch (e) { msg(e.message, 'err'); }
+    try { download(`gut-check-${dayKey(Date.now())}.xlsx`, await xlsxBlob(entries())); } catch (e) { msg(e.message, 'err'); }
   };
   $('#impFile').onchange = async e => {
     const f = e.target.files[0]; e.target.value = ''; if (!f) return;
@@ -777,7 +865,11 @@ function init() {
   setInterval(() => { if (!document.hidden) renderKpis(entries()), renderRecent(entries()); }, 60e3);
 
   setTab(ui.tab);
-  scheduleSync(100);
+  // reopen the linked phone file (if any) before the first save, so nothing lands in the wrong place
+  (FS_OK ? idb.get('file').catch(() => null) : Promise.resolve(null)).then(async h => {
+    if (h) { fileHandle = h; try { filePerm = await permOf(h, false); } catch { filePerm = 'prompt'; } }
+    render(); scheduleSync(50);
+  });
 }
 init();
 })();
