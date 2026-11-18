@@ -1,10 +1,2 @@
-# corpus build cache — regenerable transient GitHub/docs responses (60 req/hr politeness cache)
-corpus/.cache/
-
-# python
-__pycache__/
-*.pyc
-
-# local marketing drafts (not part of the tool)
-LAUNCH_POST.md
-POST.md
+.DS_Store
+node_modules/

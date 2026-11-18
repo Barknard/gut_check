@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121211">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gut Log">
+<meta name="robots" content="noindex, nofollow">
+<title>Gut Log</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1 class="brand"><span class="brand-mark" aria-hidden="true"></span>Gut Log</h1>
+    <button class="sync" id="syncBtn" type="button" aria-label="Sync status">
+      <span class="sync-dot" id="syncDot"></span><span id="syncText">Local</span>
+    </button>
+    <button class="icon-btn" id="settingsBtn" type="button" aria-label="Settings">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.3 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4L4.6 11a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 1.7 1l.3 2.5h4l.3-2.5a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6ZM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z" transform="translate(-1 0)"/></svg>
+    </button>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" class="tab is-on" data-tab="home" aria-selected="true">Log</button>
+    <button role="tab" class="tab" data-tab="history" aria-selected="false">History</button>
+    <button role="tab" class="tab" data-tab="trends" aria-selected="false">Details</button>
+  </nav>
+
+  <main>
+    <!-- HOME -->
+    <section class="view is-on" id="view-home" role="tabpanel">
+      <div class="kpis" id="kpis"></div>
+
+      <div class="actions" id="actions">
+        <button class="act act-poop" data-act="poop" type="button"><span class="act-ico" data-icon="poop"></span><span class="act-label">Poop</span></button>
+        <button class="act act-mira" data-act="miralax" type="button"><span class="act-ico" data-icon="miralax"></span><span class="act-label">MiraLAX</span></button>
+        <button class="act act-gasx" data-act="gasx" type="button"><span class="act-ico" data-icon="gasx"></span><span class="act-label">Gas-X</span></button>
+      </div>
+
+      <div class="picker" id="picker" hidden>
+        <div class="picker-head">
+          <h2>What did it look like?</h2>
+          <div class="when" id="when" role="radiogroup" aria-label="When">
+            <button type="button" class="chip is-on" data-ago="0">Now</button>
+            <button type="button" class="chip" data-ago="15">15m ago</button>
+            <button type="button" class="chip" data-ago="30">30m ago</button>
+            <button type="button" class="chip" data-ago="60">1h ago</button>
+          </div>
+        </div>
+        <div class="bristol-grid" id="bristolGrid"></div>
+        <button class="ghost wide" id="pickCancel" type="button">Cancel</button>
+      </div>
+
+      <div class="recent" id="recent"></div>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="view" id="view-history" role="tabpanel">
+      <div class="hist-filter" id="histFilter">
+        <button class="chip is-on" data-f="all" type="button">All</button>
+        <button class="chip" data-f="poop" type="button">Poop</button>
+        <button class="chip" data-f="miralax" type="button">MiraLAX</button>
+        <button class="chip" data-f="gasx" type="button">Gas-X</button>
+      </div>
+      <div id="historyList"></div>
+    </section>
+
+    <!-- TRENDS -->
+    <section class="view" id="view-trends" role="tabpanel">
+      <div class="range" id="range">
+        <button class="chip" data-r="7" type="button">7 days</button>
+        <button class="chip is-on" data-r="14" type="button">14 days</button>
+        <button class="chip" data-r="30" type="button">30 days</button>
+        <button class="chip" data-r="90" type="button">90 days</button>
+        <button class="chip" data-r="0" type="button">All</button>
+      </div>
+      <div id="trends"></div>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden>
+  <span id="toastText"></span><button type="button" id="toastUndo">Undo</button>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<!-- Edit entry -->
+<dialog id="editDlg">
+  <form method="dialog" class="dlg">
+    <h2 id="editTitle">Edit entry</h2>
+    <label>When<input type="datetime-local" id="editWhen" required></label>
+    <label id="editTypeWrap">Bristol type<select id="editType"></select></label>
+    <div class="dlg-row">
+      <button type="button" class="danger" id="editDelete">Delete</button>
+      <span class="grow"></span>
+      <button type="button" class="ghost" id="editCancel">Cancel</button>
+      <button type="submit" class="primary" id="editSave" value="save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Settings -->
+<dialog id="setDlg">
+  <form method="dialog" class="dlg" id="setForm">
+    <h2>Settings</h2>
+    <p class="hint">Entries are saved as a CSV file in a GitHub repo that Excel can open. Set it up once on each phone you use.</p>
+    <fieldset>
+      <legend>Save to GitHub</legend>
+      <div class="two">
+        <label>Owner<input id="sOwner" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+        <label>Repository<input id="sRepo" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+      </div>
+      <div class="two">
+        <label>Branch<input id="sBranch" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+        <label>File<input id="sPath" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+      </div>
+      <label>Access token <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">make one</a>
+        <input id="sToken" type="password" autocomplete="off" placeholder="github_pat_…" spellcheck="false"></label>
+      <p class="hint">Use a fine-grained token limited to this one repository with <b>Contents: Read and write</b>. The token stays on this phone only.</p>
+      <div class="dlg-row">
+        <span id="setMsg" class="set-msg"></span><span class="grow"></span>
+        <button type="button" class="ghost" id="setDisconnect">Disconnect</button>
+        <button type="button" class="primary" id="setSave">Save &amp; connect</button>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Files</legend>
+      <div class="dlg-row wrap">
+        <button type="button" class="ghost" id="expXlsx">Download Excel</button>
+        <button type="button" class="ghost" id="expCsv">Download CSV</button>
+        <label class="ghost filebtn">Import file…<input type="file" id="impFile" accept=".csv,.txt,.tsv,.xlsx,.xls,text/csv,text/plain"></label>
+      </div>
+      <p class="hint">Import reads Excel, CSV or text files. It needs a date/time column and an event column (Poop, MiraLAX or Gas-X). A Bristol type column is optional. Duplicate rows are skipped.</p>
+    </fieldset>
+    <div class="dlg-row"><span class="grow"></span><button class="primary" value="close">Done</button></div>
+  </form>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>

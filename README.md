@@ -1,112 +1,58 @@
-# iesens
+# Gut Log
 
-**A capability coach for Claude Code that teaches, then does.**
+A tiny, phone-first tracker for bowel movements (Bristol stool scale 1–7), **MiraLAX** and **Gas-X**.
 
-Nobody knows every Claude Code capability — and the moment you learn one, you use
-it. iesens closes that gap. It watches how you actually work, notices the native
-capability you're underusing, teaches it in plain language, shows you **how others
-use it**, and on a single "yes" **sets it up for you**. The name is the spec:
-*iesens* is *sensei* rearranged — a teacher that guides you toward mastery and can
-demonstrate by doing. The goal is your growing independence: every nudge should
-make you a little more capable, so over time you reach for it less.
+- **Log tab:** three KPIs (poops/day, average stool type, time between poops) and three big buttons.
+  Tap **Poop** to pick a Bristol type (with a "15m / 30m / 1h ago" option), or tap a medicine to log it instantly.
+  Every log shows an **Undo** toast.
+- **History tab:** every entry, grouped by day. Tap a row to change its time or type; tap the trash icon twice to delete it.
+- **Details tab:** pattern sentences (e.g. *"After MiraLAX, the next poop typically comes 3h 50m later"*), plus charts for
+  poops per day with medicine doses, stool type over time, type mix, medicine timing (before / during / after a poop),
+  time of day, and weekly averages.
 
-## The contract: observe → expand → or vanish
+No build step and no server. It's plain HTML, CSS and JS served by GitHub Pages.
 
-A nudge never blocks you. First just **one plain-language line** naming what you
-keep doing and the payoff; only if you opt in does it **teach** (what / why / how),
-show **how others do it**, and lay out a small menu. Ignore it and it vanishes.
+## Where the data lives
 
-```
-💡 noticed you keep running `git push --tags` by hand — it could be one saved command.
-   Would you like to know more?  (yes / no / or just keep working)
+Each entry is written to **`data/gut-log.csv`** on a branch named **`data`** in a GitHub repo you choose.
+The app creates both the branch and the file the first time it saves. Excel, Numbers and Google Sheets all open the CSV directly.
 
-  → on "yes":  a 2–4 line lesson + one real "how others do it" example + a menu
-               (save it as a command · make a skill · just explain · never suggest this)
-  → on anything else:  it vanishes, and your message is handled normally
-```
+| id | timestamp | date | time | weekday | event | bristol_type | bristol_description |
+|---|---|---|---|---|---|---|---|
+| mwl…| 2026-11-18T08:12:00-05:00 | 2026-11-18 | 08:12 | Wed | Poop | 4 | Like a sausage or snake, smooth and soft |
 
-Two things make it more than the "do-X-with-AI" guides:
+- Logging works offline too: entries queue on the phone and save when the connection returns.
+- Two phones can log to the same file. If both save at the same moment, the app reloads the file and merges the entries instead of overwriting.
+- **Settings → Download Excel / Download CSV** exports everything.
+  **Import file…** reads `.xlsx`, `.csv` or `.txt` files and skips duplicate rows.
 
-1. **It does the work.** On "yes" it writes the memory file, scaffolds the skill,
-   or wires the hook — not just advice.
-2. **It's grounded in real usage.** Every "how others do it" line is drawn from a
-   small, license-aware corpus of real public GitHub usage (facts + a link to the
-   actual repo — it never fabricates a citation or reproduces unlicensed prose).
+## Setup (about 5 minutes)
 
-It is useful at **N=1** (a single user, zero network).
+1. **Publish the site.** Merge this branch into `main`. In the repo, open **Settings → Pages**, choose
+   **Deploy from a branch → `main` / root**, and wait a minute. The site will be at `https://<owner>.github.io/<repo>/`.
+   > GitHub Pages on a *private* repo needs a paid GitHub plan. The page itself contains no data,
+   > so you can also host it from a public repo and keep the data in a private one (step 3).
+2. **Make a token.** Go to <https://github.com/settings/personal-access-tokens/new> and create a **fine-grained** token:
+   - Repository access: **Only select repositories →** the repo that will hold the data
+   - Permissions: **Contents → Read and write**
+   - Expiration: whatever you're comfortable with. The app will show "Not saved" when the token expires.
+3. **On the phone:** open the site, tap ⚙️, and check that Owner and Repository point at the **data** repo
+   (these fill in automatically from the URL). Paste the token, then tap **Save & connect**. Anything already logged on the phone gets uploaded.
+4. **Add it to the home screen.** On iPhone, tap Safari's Share button, then **Add to Home Screen**. It then opens full screen like an app.
 
-## What's wired
-
-- **`/iesens`** — an on-demand review: it surfaces the single highest-leverage
-  capability you're missing as a one-line observation (expand on "yes"). Also
-  where you manage toggles and ask it to "turn how I do X into a skill". The
-  in-session path can reason across all six surfaces:
-  `memory · skills · subagents · hooks · slash commands · MCP`.
-- **Ambient hooks** (privacy-safe, fail-open):
-  - `watcher.py` (PostToolUse) records a privacy-safe command *signature*
-    (program + subcommands + flags only — never arguments, messages, paths, or
-    file contents) and learns which capabilities you already use, by behavior.
-  - `coach_pass.py` (Stop) surfaces one nudge when you repeat a real command
-    enough times — naming the actual command, gated so it never repeats what
-    you've adopted or declined.
-  - `learn.py` (UserPromptSubmit) records your **yes / no / never** into the
-    relevance-gate ledgers and triggers the teach-then-do flow on "yes".
-  - Today the ambient layer fires on **repeated shell commands**; the other
-    surfaces are surfaced through the in-session `/iesens` path.
-- **Relevance gate** — never repeats a suggestion you've adopted (observed from
-  behavior) or declined; only surfaces net-new, real gains.
-
-## Install
-
-```powershell
-# from this folder
-./install.ps1     # copies the skill to ~/.claude/skills/iesens, seeds config
-```
-
-Then run `/iesens` in any Claude Code session. To enable the ambient nudges, wire
-the three hooks (via the `update-config` skill, which never blind-edits settings):
-
-```
-PostToolUse      -> python <repo>/hooks/watcher.py
-Stop             -> python <repo>/hooks/coach_pass.py
-UserPromptSubmit -> python <repo>/hooks/learn.py
-```
-
-## Config
-
-`iesens.config.json` (also at `~/.claude/iesens/config.json`): enable/disable,
-per-detector sensitivity, `quiet`, `max_suggestions_per_turn`, and the
-relevance-gate ledgers (`adopted` / `declined` / `dismissed`). Observed-in-use
-surfaces are tracked in `~/.claude/iesens/adopted_surfaces.json`.
+The token is stored only in that phone's browser storage. It never gets committed.
 
 ## Privacy
 
-The local usage log stores only a coarse, sanitized signature of each action —
-program + subcommands + flags for shell commands, a file extension for edits.
-Never your arguments, commit messages, paths, secrets, or file contents, and
-nothing leaves your machine. (A future opt-in "collective" tier would share only
-aggregated, anonymized signals — never code or commands.)
+Keep the repository that holds `data/gut-log.csv` **private**: it's health data. The page has a `noindex` meta tag.
 
-## Tests
+## Files
 
 ```
-python tests/test_learning.py      # the learning loop (ledgers, gate, adoption)
-python tests/test_audit_fixes.py   # privacy + denoise + yes-bridge regressions
-python tests/sim_session.py        # a full multi-turn session simulation
-python tests/test_corpus.py        # the "how others do it" corpus ingester
+index.html            page structure
+styles.css            dark, colorblind-safe theme
+app.js                logging, GitHub sync, stats and charts (no dependencies;
+                      the Excel library loads from cdnjs only for .xlsx import/export)
+manifest.webmanifest  "Add to Home Screen" support
+icon.svg, icon-*.png  app icon
 ```
-
-## Extend it
-
-New detectors are the growth path. Copy `references/detectors/_template.md`, fill
-in {signal, lesson, how-others, executor}, and add its key to
-`iesens.config.json`. Keep each one small and single-purpose.
-
-## Status
-
-v0, built for one user first. The skill + the ambient learning loop are wired and
-tested; broader packaging/distribution is next.
-
-## License
-
-MIT — see [`LICENSE`](LICENSE).
