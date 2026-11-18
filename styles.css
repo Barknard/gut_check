@@ -14,6 +14,7 @@
   --poop: #d95926;
   --mira: #3987e5;
   --gasx: #199e70;
+  --vomit: #e3cf5a; /* light on purpose: passes CVD separation vs the 3 above; always drawn as a diamond */
 
   /* Bristol: diverging red (hard) - gray (ideal) - blue (loose) */
   --b1: #e66767; --b2: #b8605b; --b3: #8a7570; --b4: #6f6e69; --b5: #6f86a8; --b6: #4f86d0; --b7: #5598e7;
@@ -71,14 +72,14 @@ button { cursor: pointer; }
 .down::before { content: "▼ "; font-size: 9px; }
 
 /* Action buttons */
-.actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.act { position: relative; aspect-ratio: 1 / 1.08; border-radius: 22px; border: 1px solid var(--border); background: var(--surface);
+.actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.act { position: relative; aspect-ratio: 1.45 / 1; border-radius: 22px; border: 1px solid var(--border); background: var(--surface);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 10px 6px;
   transition: transform .12s ease, background .2s; overflow: hidden; }
 .act::after { content: ""; position: absolute; inset: auto 0 0 0; height: 4px; background: var(--c); opacity: .9; }
-.act-poop { --c: var(--poop); } .act-mira { --c: var(--mira); } .act-gasx { --c: var(--gasx); }
+.act-poop { --c: var(--poop); } .act-vomit { --c: var(--vomit); } .act-mira { --c: var(--mira); } .act-gasx { --c: var(--gasx); }
 .act:active { transform: scale(.94); background: var(--surface-2); }
-.act-ico { width: 64%; aspect-ratio: 1; display: block; }
+.act-ico { height: 58%; aspect-ratio: 1; display: block; }
 .act-ico svg, .b-ico svg { width: 100%; height: 100%; display: block; }
 .act-label { font-weight: 600; font-size: 14px; }
 .act.pop .act-ico { animation: pop .45s cubic-bezier(.3,1.6,.5,1); }
@@ -109,7 +110,7 @@ button { cursor: pointer; }
 /* Recent */
 .recent { margin-top: 18px; }
 .recent h3, .card h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 8px; font-weight: 700; }
-.lasts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.lasts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 8px; }
 .last { font-size: 12.5px; color: var(--text-2); text-align: center; }
 .last b { display: block; color: var(--text); font-size: 14px; }
 
@@ -141,6 +142,7 @@ button { cursor: pointer; }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--text-2); margin-top: 6px; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 .legend i.dot { border-radius: 50%; }
+.legend i.dia { width: 8px; height: 8px; border-radius: 1px; transform: rotate(45deg); margin-right: 7px; }
 .legend i.tri { width: 0; height: 0; border-radius: 0; border: 6px solid transparent; border-bottom: 9px solid var(--c); border-top: 0; vertical-align: 0; }
 svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
 svg.chart text { fill: var(--muted); font-size: 10px; font-family: inherit; }

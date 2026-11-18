@@ -1,14 +1,14 @@
 # Gut Check
 
-A tiny, phone-first tracker for bowel movements (Bristol stool scale 1–7), **MiraLAX** and **Gas-X**.
+A tiny, phone-first tracker for bowel movements (Bristol stool scale 1–7), **vomiting**, **MiraLAX** and **Gas-X**.
 
-- **Log tab:** three KPIs (poops/day, average stool type, time between poops) and three big buttons.
-  Tap **Poop** to pick a Bristol type (with a "15m / 30m / 1h ago" option), or tap a medicine to log it instantly.
+- **Log tab:** three KPIs (poops/day, average stool type, time between poops) and four big buttons.
+  Tap **Poop** to pick a Bristol type (with a "15m / 30m / 1h ago" option), or tap Vomit or a medicine to log it instantly.
   Every log shows an **Undo** toast.
 - **History tab:** every entry, grouped by day. Tap a row to change its time or type; tap the trash icon twice to delete it.
 - **Details tab:** pattern sentences (e.g. *"After MiraLAX, the next poop typically comes 3h 50m later"*), plus charts for
   poops per day with medicine doses, stool type over time, type mix, medicine timing (before / during / after a poop),
-  time of day, and weekly averages.
+  vomiting (how often, and how often it follows MiraLAX or Gas-X), time of day, and weekly averages.
 
 No build step and no server. It's plain HTML, CSS and JS served by GitHub Pages.
 

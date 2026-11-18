@@ -1,4 +1,4 @@
-/* Gut Check: a tiny tracker for bowel movements, MiraLAX and Gas-X.
+/* Gut Check: a tiny tracker for bowel movements, vomiting, MiraLAX and Gas-X.
  * Data lives in a CSV file in a GitHub repo (Excel opens it directly).
  * Writes go through the GitHub Contents API with a token kept on the device.
  * Every change is queued locally first, so taps never get lost offline. */
@@ -8,10 +8,17 @@
 /* ---------- constants ---------- */
 const EV = {
   poop:    { label: 'Poop',    csv: 'Poop',    color: 'var(--poop)', hex: '#d95926' },
+  vomit:   { label: 'Vomit',   csv: 'Vomit',   color: 'var(--vomit)', hex: '#e3cf5a' },
   miralax: { label: 'MiraLAX', csv: 'MiraLAX', color: 'var(--mira)', hex: '#3987e5' },
   gasx:    { label: 'Gas-X',   csv: 'Gas-X',   color: 'var(--gasx)', hex: '#199e70' },
 };
 const MEDS = ['miralax', 'gasx'];
+const STRIP = [['vomit', 'V'], ['miralax', 'Mx'], ['gasx', 'Gx']]; // event rows under the charts
+const EMOJI = { poop: '💩', vomit: '🤢', miralax: '💧', gasx: '🫧' };
+// vomit shares the chart with 3 other hues, so it is always drawn as a diamond (never color alone)
+const mark = (ev, cx, cy, r, attrs = '') => ev === 'vomit'
+  ? `<path d="M${cx} ${cy-r*1.25} l${r*1.25} ${r*1.25} l-${r*1.25} ${r*1.25} l-${r*1.25} -${r*1.25} z" fill="${EV[ev].color}" ${attrs}/>`
+  : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${EV[ev].color}" ${attrs}/>`;
 const BRISTOL = [null,
   { name: 'Hard lumps',   group: 'Hard',  desc: 'Separate hard lumps, like nuts (hard to pass)' },
   { name: 'Lumpy log',    group: 'Hard',  desc: 'Sausage-shaped but lumpy' },
@@ -49,6 +56,16 @@ const ICON = {
     <rect x="18" y="23" width="4" height="32" rx="2" fill="#fff" opacity=".6"/>
     <path d="M27 36 h10 l-1.5 7 h-7 z" fill="#fff"/>
     <circle cx="30" cy="34" r="1.3" fill="#fff"/><circle cx="33.5" cy="33" r="1.1" fill="#fff"/><circle cx="35" cy="35" r="1" fill="#fff"/>
+  </svg>`,
+  vomit: `<svg viewBox="0 0 64 64" aria-hidden="true">
+    <circle cx="32" cy="26" r="20" fill="#b5d98a"/>
+    <ellipse cx="25" cy="15" rx="7" ry="3" fill="#d4ecb5" opacity=".8"/>
+    <path d="M18 20 l7 3.5 l-7 3.5 M46 20 l-7 3.5 l7 3.5" stroke="#1a1a19" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <ellipse cx="32" cy="35" rx="6.5" ry="5.5" fill="#1a1a19"/>
+    <path d="M26.5 37 Q23 49 15 60 H49 Q41 49 37.5 37 Q32 41 26.5 37 Z" fill="#e3cf5a"/>
+    <path d="M30 44 q-1 6 -4 11" stroke="#f3e79a" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <circle cx="10" cy="55" r="2.6" fill="#e3cf5a"/><circle cx="54" cy="53" r="2.2" fill="#e3cf5a"/><circle cx="51" cy="45" r="1.6" fill="#e3cf5a"/>
+    <path d="M49 6 c-3 4.5 -3.5 7 0 7.5 c3.5 -.5 3 -3 0 -7.5 z" fill="#8fc8f0"/>
   </svg>`,
   gasx: `<svg viewBox="0 0 64 64" aria-hidden="true">
     <g transform="rotate(-35 31 38)">
@@ -151,6 +168,7 @@ function parseDelimited(text) {
 }
 function evFrom(s) {
   s = String(s || '').toLowerCase();
+  if (/vomit|throw|puk|emesis|🤮|🤢/.test(s)) return 'vomit';
   if (/mira|lax|peg|polyeth/.test(s)) return 'miralax';
   if (/gas|simeth/.test(s)) return 'gasx';
   if (/poo|stool|bm|bowel|movement|💩/.test(s)) return 'poop';
@@ -347,12 +365,12 @@ const svgOpen = (w, h, label) => `<svg class="chart" viewBox="0 0 ${w} ${h}" rol
 function niceMax(v) { if (v <= 4) return Math.max(1, Math.ceil(v)); const s = v <= 10 ? 2 : 5; return Math.ceil(v / s) * s; }
 
 function chartDaily(days) {
-  const W = 340, L = 22, R = 6, T = 8, H = 150, BOT = H + T, MED = 34;
+  const W = 340, L = 22, R = 6, T = 8, H = 150, BOT = H + T, MED = 13 * STRIP.length + 8;
   const max = niceMax(Math.max(...days.map(d => d.poops), 1)), n = days.length, bw = (W - L - R) / n;
   const ticks = max <= 4 ? Array.from({ length: max + 1 }, (_, i) => i) : [0, max / 2, max];
   const y = v => T + H - (v / max) * H;
   const every = n <= 10 ? 1 : n <= 21 ? 3 : n <= 45 ? 7 : 14;
-  let s = svgOpen(W, BOT + 22 + MED, 'Poops per day with medicine doses');
+  let s = svgOpen(W, BOT + 22 + MED, 'Poops per day with vomiting and medicine doses');
   for (const t of ticks) s += `<line x1="${L}" x2="${W-R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)"/><text x="${L-6}" y="${y(t)+3}" text-anchor="end">${t}</text>`;
   days.forEach((d, i) => {
     const x = L + i * bw, w = Math.max(1.5, bw - 2), cx = x + bw / 2;
@@ -361,22 +379,22 @@ function chartDaily(days) {
       s += `<path d="M${x+1} ${y(0)} V${top+r} q0 -${r} ${r} -${r} H${x+1+w-r} q${r} 0 ${r} ${r} V${y(0)} Z" fill="var(--poop)"/>`;
     }
     if ((i % every === 0 && n - 1 - i >= every / 2) || i === n - 1) s += `<text x="${cx}" y="${BOT+13}" text-anchor="middle">${new Date(d.ts).toLocaleDateString([], n > 10 ? { month: 'numeric', day: 'numeric' } : { weekday: 'narrow' })}</text>`;
-    MEDS.forEach((m, j) => {
+    STRIP.forEach(([m], j) => {
       const c = d[m], my = BOT + 26 + j * 13;
-      if (c) s += `<circle cx="${cx}" cy="${my}" r="${Math.min(4.5, bw / 2.2)}" fill="${EV[m].color}"/>${c > 1 && bw >= 10 ? `<text x="${cx}" y="${my+3}" text-anchor="middle" style="fill:#fff;font-size:7px;font-weight:700">${c}</text>` : ''}`;
+      if (c) s += mark(m, cx, my, Math.min(4.5, bw / 2.2)) + (c > 1 && bw >= 10 ? `<text x="${cx}" y="${my+3}" text-anchor="middle" style="fill:${m === 'vomit' ? '#1a1a19' : '#fff'};font-size:7px;font-weight:700">${c}</text>` : '');
     });
-    const tip = `${new Date(d.ts).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}\n${d.poops} poop${d.poops === 1 ? '' : 's'}${isFinite(d.type) ? ` · avg type ${d.type.toFixed(1)}` : ''}\nMiraLAX ${d.miralax} · Gas-X ${d.gasx}`;
+    const tip = `${new Date(d.ts).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}\n${d.poops} poop${d.poops === 1 ? '' : 's'}${isFinite(d.type) ? ` · avg type ${d.type.toFixed(1)}` : ''}${d.vomit ? `\nVomit ${d.vomit}` : ''}\nMiraLAX ${d.miralax} · Gas-X ${d.gasx}`;
     s += `<rect x="${x}" y="${T}" width="${bw}" height="${BOT + 22 + MED - T}" fill="transparent" data-tip="${esc(tip)}"/>`;
   });
   s += `<line x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}" stroke="var(--border)"/>`;
-  MEDS.forEach((m, j) => s += `<text x="${L-6}" y="${BOT+29+j*13}" text-anchor="end" style="font-size:8px">${m === 'miralax' ? 'Mx' : 'Gx'}</text>`);
+  STRIP.forEach(([, lab], j) => s += `<text x="${L-6}" y="${BOT+29+j*13}" text-anchor="end" style="font-size:8px">${lab}</text>`);
   return s + '</svg>';
 }
 
 function chartTypeOverTime(list, from, to) {
   const W = 340, L = 22, R = 8, T = 8, H = 150, span = Math.max(to - from, DAY);
   const x = ts => L + ((ts - from) / span) * (W - L - R), y = b => T + ((7 - b) / 6) * H;
-  let s = svgOpen(W, T + H + 34, 'Bristol type of each poop over time');
+  let s = svgOpen(W, T + H + 44, 'Bristol type of each poop over time');
   s += `<rect x="${L}" y="${y(4)}" width="${W-L-R}" height="${y(3)-y(4)}" fill="#0ca30c" opacity=".12"/>`;
   s += `<text x="${L+4}" y="${y(3)+12}" style="fill:#5fd35f;font-size:9px">ideal 3–4</text>`;
   for (let b = 1; b <= 7; b++) s += `<line x1="${L}" x2="${W-R}" y1="${y(b)}" y2="${y(b)}" stroke="var(--grid)" stroke-dasharray="${b === 4 ? '' : '2 3'}"/><text x="${L-6}" y="${y(b)+3}" text-anchor="end">${b}</text>`;
@@ -388,10 +406,10 @@ function chartTypeOverTime(list, from, to) {
   }
   for (const p of poops) s += `<circle cx="${x(p.ts)}" cy="${y(p.b)}" r="4.5" fill="${BCOL[p.b]}" stroke="var(--surface)" stroke-width="2" data-tip="${esc(`${fmtDay(p.ts)} ${fmtTime(p.ts)}\nType ${p.b}: ${BRISTOL[p.b].name}`)}"/>`;
   const base = T + H + 14;
-  MEDS.forEach((m, j) => {
+  STRIP.forEach(([m], j) => {
     for (const d of list.filter(e => e.ev === m && e.ts >= from && e.ts <= to)) {
-      const cx = x(d.ts), cy = base + j * 10;
-      s += `<path d="M${cx} ${cy-4} l4 7 h-8 z" fill="${EV[m].color}" data-tip="${esc(`${EV[m].label}\n${fmtDay(d.ts)} ${fmtTime(d.ts)}`)}"/>`;
+      const cx = x(d.ts), cy = base + j * 10, tip = `data-tip="${esc(`${EV[m].label}\n${fmtDay(d.ts)} ${fmtTime(d.ts)}`)}"`;
+      s += m === 'vomit' ? mark(m, cx, cy, 3.6, tip) : `<path d="M${cx} ${cy-4} l4 7 h-8 z" fill="${EV[m].color}" ${tip}/>`;
     }
   });
   return s + '</svg>';
@@ -456,11 +474,29 @@ function weeks(list) {
     const inW = list.filter(x => x.ts >= s && x.ts < e), poops = inW.filter(x => x.ev === 'poop');
     const days = Math.max(1, (Math.min(e, now) - Math.max(s, startOfDay(list[0].ts))) / DAY);
     out.push({ s, perDay: poops.length / days, type: mean(poops.filter(p => p.b).map(p => p.b)),
-      mira: inW.filter(x => x.ev === 'miralax').length / days, gasx: inW.filter(x => x.ev === 'gasx').length / days });
+      mira: inW.filter(x => x.ev === 'miralax').length / days, gasx: inW.filter(x => x.ev === 'gasx').length / days, vomit: inW.filter(x => x.ev === 'vomit').length });
   }
   return out;
 }
 
+// For each vomit: was a medicine taken in the 6h before it, and was there a poop within 2h?
+function vomitStats(list, from, to, effDays) {
+  const v = list.filter(e => e.ev === 'vomit' && e.ts >= from && e.ts <= to);
+  const near = (ev, d, before, after) => list.some(e => e.ev === ev && e.ts >= d.ts - before && e.ts <= d.ts + after && e !== d);
+  const r = { n: v.length, perWeek: v.length / effDays * 7, last: v.length ? v[v.length - 1].ts : NaN,
+    afterMira: v.filter(d => near('miralax', d, 6 * HOUR, 0)).length,
+    afterGasx: v.filter(d => near('gasx', d, 6 * HOUR, 0)).length,
+    nearPoop: v.filter(d => near('poop', d, 2 * HOUR, 2 * HOUR)).length,
+    days: new Set(v.map(d => dayKey(d.ts))).size };
+  return r;
+}
+function vomitInsights(vs) {
+  const out = []; if (!vs.n) return out;
+  out.push(['🤢', `Vomited ${vs.n} time${vs.n === 1 ? '' : 's'} on ${vs.days} day${vs.days === 1 ? '' : 's'} in this period (${vs.perWeek.toFixed(1)} a week).`]);
+  for (const [k, lab] of [['afterMira', 'MiraLAX'], ['afterGasx', 'Gas-X']])
+    if (vs.n >= 2 && vs[k] / vs.n >= .5) out.push(['🔍', `${vs[k]} of ${vs.n} vomiting episodes came within 6h after taking ${lab}.`]);
+  return out;
+}
 function insights(list, from, to, cur, timing) {
   const out = [], poops = list.filter(e => e.ev === 'poop' && e.ts >= from && e.ts <= to);
   if (!poops.length) return out;
@@ -505,30 +541,44 @@ function renderTrends(list) {
   const days = Array.from({ length: nDays }, (_, i) => {
     const s = addDays(from, i), e = addDays(s, 1), d = inR.filter(x => x.ts >= s && x.ts < e);
     const p = d.filter(x => x.ev === 'poop');
-    return { ts: s, poops: p.length, type: mean(p.filter(x => x.b).map(x => x.b)), miralax: d.filter(x => x.ev === 'miralax').length, gasx: d.filter(x => x.ev === 'gasx').length };
+    return { ts: s, poops: p.length, type: mean(p.filter(x => x.b).map(x => x.b)), vomit: d.filter(x => x.ev === 'vomit').length, miralax: d.filter(x => x.ev === 'miralax').length, gasx: d.filter(x => x.ev === 'gasx').length };
   });
   const effDays = Math.max(1, (to - Math.max(from, startOfDay(list[0].ts))) / DAY);
   const gaps = []; for (let i = 1; i < poops.length; i++) gaps.push(poops[i].ts - poops[i-1].ts);
   const cur = { perDay: poops.length / effDays, type: mean(poops.filter(p => p.b).map(p => p.b)), gaps };
   const timing = Object.fromEntries(MEDS.map(m => [m, doseTiming(list, m, from, to)]));
-  const ins = insights(list, from, to, cur, timing);
+  const vs = vomitStats(list, from, to, effDays);
+  const ins = [...insights(list, from, to, cur, timing), ...vomitInsights(vs)];
   const wk = weeks(list);
   const pct = (c, n) => n ? Math.round(c / n * 100) : 0;
 
   el.innerHTML = `
   ${ins.length ? `<div class="card"><h3>Patterns</h3><ul class="insights">${ins.map(([i, t]) => `<li><span>${i}</span><span>${esc(t)}</span></li>`).join('')}</ul></div>` : ''}
 
-  <div class="card"><h3>Poops per day</h3><p class="sub">Bars are poops. Dots underneath are medicine doses that day.</p>
+  <div class="card"><h3>Poops per day</h3><p class="sub">Bars are poops. Marks underneath are vomiting (◆) and medicine doses (●) that day.</p>
     ${chartDaily(days)}
-    <div class="legend"><span><i style="background:var(--poop)"></i>Poops</span><span><i class="dot" style="background:var(--mira)"></i>MiraLAX (Mx)</span><span><i class="dot" style="background:var(--gasx)"></i>Gas-X (Gx)</span></div>
+    <div class="legend"><span><i style="background:var(--poop)"></i>Poops</span><span><i class="dia" style="background:var(--vomit)"></i>Vomit (V)</span><span><i class="dot" style="background:var(--mira)"></i>MiraLAX (Mx)</span><span><i class="dot" style="background:var(--gasx)"></i>Gas-X (Gx)</span></div>
   </div>
 
   <div class="card"><h3>Stool type over time</h3><p class="sub">Each dot is one poop. The line is the average of the last 5.</p>
     ${chartTypeOverTime(list, from, to)}
-    <div class="legend"><span><i class="dot" style="background:${BCOL[1]}"></i>Hard</span><span><i class="dot" style="background:${BCOL[4]}"></i>Ideal</span><span><i class="dot" style="background:${BCOL[7]}"></i>Loose</span><span><i class="tri" style="--c:var(--mira)"></i>MiraLAX</span><span><i class="tri" style="--c:var(--gasx)"></i>Gas-X</span></div>
+    <div class="legend"><span><i class="dot" style="background:${BCOL[1]}"></i>Hard</span><span><i class="dot" style="background:${BCOL[4]}"></i>Ideal</span><span><i class="dot" style="background:${BCOL[7]}"></i>Loose</span><span><i class="dia" style="background:var(--vomit)"></i>Vomit</span><span><i class="tri" style="--c:var(--mira)"></i>MiraLAX</span><span><i class="tri" style="--c:var(--gasx)"></i>Gas-X</span></div>
   </div>
 
   <div class="card"><h3>Type mix</h3><p class="sub">${poops.filter(p => p.b).length} poops with a recorded type</p>${chartMix(poops)}</div>
+
+  <div class="card"><h3>Vomiting</h3>
+    ${vs.n ? `<div class="statgrid">
+      <div class="stat"><b>${vs.n}</b><span>times in this period</span></div>
+      <div class="stat"><b>${vs.perWeek.toFixed(1)}</b><span>per week</span></div>
+      <div class="stat"><b>${vs.days}</b><span>day${vs.days === 1 ? '' : 's'} with vomiting</span></div>
+      <div class="stat"><b>${ago(vs.last).replace(' ago', '')}</b><span>since the last time</span></div></div>
+    <div class="timing">
+      ${[['afterMira', 'After MiraLAX'], ['afterGasx', 'After Gas-X'], ['nearPoop', 'Near a poop']].map(([k, l]) =>
+        `<div class="tbar"><span>${l}</span><span class="track"><span class="fill" style="display:block;width:${pct(vs[k], vs.n)}%"></span></span><span class="pct">${pct(vs[k], vs.n)}%</span></div>`).join('')}
+      <p class="sub" style="margin:6px 0 0">“After” means the medicine was taken in the 6 hours before vomiting. “Near a poop” means within 2 hours either side.</p></div>`
+    : `<p class="sub" style="margin:0">None logged in this period.</p>`}
+  </div>
 
   <div class="card"><h3>Medicine</h3>
     <div class="statgrid">${MEDS.map(m => `<div class="stat"><b>${(timing[m].n / effDays).toFixed(1)}</b><span>${EV[m].label} / day</span></div>`).join('')}
@@ -542,8 +592,8 @@ function renderTrends(list) {
 
   <div class="card"><h3>Time of day</h3>${chartHours(poops)}</div>
 
-  ${wk.length ? `<div class="card"><h3>Weekly averages</h3><table class="weeks"><thead><tr><th>Week of</th><th>Poops/d</th><th>Type</th><th>Mira/d</th><th>Gas-X/d</th></tr></thead><tbody>
-    ${wk.map(w => `<tr><td>${new Date(w.s).toLocaleDateString([], { month: 'short', day: 'numeric' })}</td><td>${w.perDay.toFixed(1)}</td><td>${isFinite(w.type) ? w.type.toFixed(1) : '–'}</td><td>${w.mira.toFixed(1)}</td><td>${w.gasx.toFixed(1)}</td></tr>`).join('')}
+  ${wk.length ? `<div class="card"><h3>Weekly averages</h3><table class="weeks"><thead><tr><th>Week of</th><th>Poops/d</th><th>Type</th><th>Mira/d</th><th>Gas-X/d</th><th>Vomit</th></tr></thead><tbody>
+    ${wk.map(w => `<tr><td>${new Date(w.s).toLocaleDateString([], { month: 'short', day: 'numeric' })}</td><td>${w.perDay.toFixed(1)}</td><td>${isFinite(w.type) ? w.type.toFixed(1) : '–'}</td><td>${w.mira.toFixed(1)}</td><td>${w.gasx.toFixed(1)}</td><td>${w.vomit || '–'}</td></tr>`).join('')}
   </tbody></table></div>` : ''}`;
 }
 
@@ -575,7 +625,7 @@ function log(ev, b = null, ts = Date.now()) {
   const e = { id: newId(), ts, ev, b };
   queue({ op: 'add', e }); buzz();
   const btn = $(`.act[data-act="${ev}"]`); btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop');
-  toast(ev === 'poop' ? `💩 Type ${b} logged${ts < Date.now() - MIN ? ` at ${fmtTime(ts)}` : ''}` : `${ev === 'miralax' ? '💧' : '🫧'} ${EV[ev].label} logged at ${fmtTime(ts)}`, [e.id]);
+  toast(ev === 'poop' ? `💩 Type ${b} logged${ts < Date.now() - MIN ? ` at ${fmtTime(ts)}` : ''}` : `${EMOJI[ev]} ${EV[ev].label} logged at ${fmtTime(ts)}`, [e.id]);
 }
 let pickAgo = 0;
 function openPicker() {

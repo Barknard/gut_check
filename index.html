@@ -41,6 +41,7 @@
 
       <div class="actions" id="actions">
         <button class="act act-poop" data-act="poop" type="button"><span class="act-ico" data-icon="poop"></span><span class="act-label">Poop</span></button>
+        <button class="act act-vomit" data-act="vomit" type="button"><span class="act-ico" data-icon="vomit"></span><span class="act-label">Vomit</span></button>
         <button class="act act-mira" data-act="miralax" type="button"><span class="act-ico" data-icon="miralax"></span><span class="act-label">MiraLAX</span></button>
         <button class="act act-gasx" data-act="gasx" type="button"><span class="act-ico" data-icon="gasx"></span><span class="act-label">Gas-X</span></button>
       </div>
@@ -67,6 +68,7 @@
       <div class="hist-filter" id="histFilter">
         <button class="chip is-on" data-f="all" type="button">All</button>
         <button class="chip" data-f="poop" type="button">Poop</button>
+        <button class="chip" data-f="vomit" type="button">Vomit</button>
         <button class="chip" data-f="miralax" type="button">MiraLAX</button>
         <button class="chip" data-f="gasx" type="button">Gas-X</button>
       </div>
@@ -138,7 +140,7 @@
         <button type="button" class="ghost" id="expCsv">Download CSV</button>
         <label class="ghost filebtn">Import file…<input type="file" id="impFile" accept=".csv,.txt,.tsv,.xlsx,.xls,text/csv,text/plain"></label>
       </div>
-      <p class="hint">Import reads Excel, CSV or text files. It needs a date/time column and an event column (Poop, MiraLAX or Gas-X). A Bristol type column is optional. Duplicate rows are skipped.</p>
+      <p class="hint">Import reads Excel, CSV or text files. It needs a date/time column and an event column (Poop, Vomit, MiraLAX or Gas-X). A Bristol type column is optional. Duplicate rows are skipped.</p>
     </fieldset>
     <div class="dlg-row"><span class="grow"></span><button class="primary" value="close">Done</button></div>
   </form>
