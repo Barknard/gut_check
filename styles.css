@@ -320,3 +320,6 @@ dialog.wiz .dlg { gap: 12px; padding-bottom: 22px; }
 dialog.wiz .places-box { text-align: left; }
 dialog.wiz label { text-align: left; }
 dialog.wiz .wz-list { text-align: left; }
+
+.check { display: flex !important; gap: 10px; align-items: flex-start; font-size: 14.5px !important; color: var(--text) !important; font-weight: 500 !important; background: var(--surface-2); border-radius: 12px; padding: 10px 12px; }
+.check input { width: 20px !important; height: 20px; margin: 1px 0 0; flex: none; accent-color: #b3261e; }

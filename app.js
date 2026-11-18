@@ -111,7 +111,8 @@ const iconFor = e => e.ev === 'poop' && e.b ? BICON[e.b] : ICON[e.ev];
  * new it holds (another phone, edits made in Excel). Only a delete made in this app ever
  * removes an entry, so nothing is lost by a missing or out-of-date copy. */
 const load = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
-const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+let wiping = false; // set while resetting the app, so nothing is written back afterwards
+const save = (k, v) => { if (wiping) return; try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 const fixEv = e => e && e.ev === 'miralax' ? { ...e, ev: 'imodium' } : e; // the Imodium button used to say MiraLAX
 const fixOp = o => o.op === 'add' ? { ...o, e: fixEv(o.e) } : o;
 
@@ -137,7 +138,7 @@ function defaultCfg() {
 }
 // Remembered twice on the device (localStorage + IndexedDB). Cookies aren't used: they'd send the
 // Sheet's secret key to the web server on every page load.
-function remember(k, v) { save('gl.' + k, v); try { idb.set('mem:' + k, v).catch(() => {}); } catch {} }
+function remember(k, v) { if (wiping) return; save('gl.' + k, v); try { idb.set('mem:' + k, v).catch(() => {}); } catch {} }
 function saveCfg() { remember('cfg', cfg); }
 const connected = () => !!(cfg.owner && cfg.repo && cfg.token && cfg.path);
 const gsConnected = () => !!(cfg.gsUrl && cfg.gsKey);
@@ -293,7 +294,9 @@ const idb = (() => {
     t.oncomplete = () => res(q.result); t.onerror = () => rej(t.error);
   }); };
   return { get: k => tx('readonly', st => st.get(k)), set: (k, v) => tx('readwrite', st => st.put(v, k)),
-    del: k => tx('readwrite', st => st.delete(k)), keys: () => tx('readonly', st => st.getAllKeys()) };
+    del: k => tx('readwrite', st => st.delete(k)), keys: () => tx('readonly', st => st.getAllKeys()),
+    async wipe() { try { if (p) (await p).close(); } catch {} p = null;
+      await new Promise(res => { const r = indexedDB.deleteDatabase('gutcheck'); r.onsuccess = r.onerror = r.onblocked = () => res(); }); } };
 })();
 const isXlsx = h => /\.xlsx$/i.test(h.name);
 async function permOf(h, ask) {
@@ -443,7 +446,7 @@ function setStatus(s) {
 let bkTimer = 0;
 function scheduleBackup() { clearTimeout(bkTimer); bkTimer = setTimeout(() => backupNow(), 3000); }
 async function backupNow(label) {
-  if (!local.length && !label) return; // never let an empty log replace a day's backup
+  if (wiping || (!local.length && !label)) return; // never let an empty log replace a day's backup
   try {
     await idb.set('bk:' + (label || dayKey(Date.now())), { at: Date.now(), list: local });
     const keys = (await idb.keys()).map(String).filter(k => k.startsWith('bk:')).sort();
@@ -1205,6 +1208,36 @@ function init() {
     toast(`🧹 Deleted all ${all.length} entries`, () => queue(...all.map(e => ({ op: 'add', e }))), 10000);
   };
 
+  // reset the whole app on this phone, optionally emptying the Sheet / file first
+  $('#wipeOpen').onclick = () => {
+    const ts = targets();
+    $('#wipeAlsoRow').hidden = $('#wipeHint').hidden = !ts.length;
+    $('#wipePlaces').textContent = ts.map(t => t === 'gsheet' ? 'the Google Sheet' : t === 'file' ? cfg.fileName : 'GitHub').join(' and ');
+    $('#wipeAlso').checked = false; $('#wipeMsg').textContent = '';
+    $('#wipeDlg').showModal();
+  };
+  $('#wipeCancel').onclick = () => $('#wipeDlg').close();
+  $('#wipeGo').onclick = async () => {
+    const m = (t, c = '') => { const el = $('#wipeMsg'); el.textContent = t; el.className = 'set-msg ' + c; };
+    const btn = $('#wipeGo'); btn.disabled = true;
+    if ($('#wipeAlso').checked && targets().length) {
+      m('Deleting the entries…');
+      const kept = local.slice();
+      if (kept.length) queue(...kept.map(e => ({ op: 'del', id: e.id })));
+      while (syncing) await new Promise(r => setTimeout(r, 100));
+      clearTimeout(syncTimer); await sync();
+      const bad = targets().filter(t => tstat[t]?.err || waiting(t));
+      if (bad.length) { // put everything back exactly as it was
+        if (kept.length) queue(...kept.map(e => ({ op: 'add', e })));
+        btn.disabled = false; return m(`Couldn't delete from ${bad.map(t => PLACE[t]()).join(' and ')}, so nothing was reset. ${tstat[bad[0]]?.err === 'perm' ? 'The file needs permission again.' : tstat[bad[0]]?.err || ''}`, 'err'); }
+    }
+    m('Resetting…');
+    wiping = true; clearTimeout(syncTimer); clearTimeout(bkTimer);
+    try { Object.keys(localStorage).filter(k => k.startsWith('gl.')).forEach(k => localStorage.removeItem(k)); } catch {}
+    await idb.wipe();
+    location.replace(location.pathname); // reload as a brand-new visitor
+  };
+
   // files
   const copySaved = () => { save(K.copy, Date.now()); renderBanner(); refreshPlaces(); };
   $('#expCsv').onclick = () => { download(`gut-check-${dayKey(Date.now())}.csv`, new Blob(['﻿' + toCSV(entries())], { type: 'text/csv' })); copySaved(); };
@@ -1396,6 +1429,7 @@ function init() {
 
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { render(); scheduleSync(200); } });
   addEventListener('online', () => scheduleSync(200));
+  addEventListener('hashchange', () => connectFromHash()); // the connection link opened while the app is already open
   setInterval(() => { if (!document.hidden) { renderKpis(entries()); renderRecent(entries()); renderBanner(); } }, 60e3);
   try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch {} // ask the browser not to clear app data
 

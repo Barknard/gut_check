@@ -10,7 +10,9 @@ A tiny, phone-first tracker for bowel movements (Bristol stool scale 1–7), **v
   - Each candidate pattern gets a proper test: Mann-Whitney U, Welch t, Fisher exact, chi-square, or a regression slope.
   - The p-values are Bonferroni-adjusted for the number of patterns checked. Only patterns that stay under 0.05 are shown as reliable; otherwise the strongest one is labelled "early sign".
   - **Next** cycles through the other reliable patterns.
-- **Start over:** ⚙️ → **Delete all entries…** asks for confirmation (with a "download a backup first" button), deletes everything wherever it's saved, and offers Undo for 10 seconds. Settings are kept.
+- **Start over:** two buttons in ⚙️ Settings.
+  - **Delete all entries** asks for confirmation (with a "download a backup first" button), empties the log everywhere it's saved, and offers Undo for 10 seconds. Setup is kept.
+  - **Reset app (like new)** makes the phone forget everything: entries, backups, where it saves, and that it has been opened before. It then reloads and shows the setup again. A tick box also empties the Google Sheet / file first; if that fails, nothing is reset.
 - **Details tab:** pattern sentences (e.g. *"After Imodium, the next poop typically comes 3h 50m later"*), plus charts for
   poops per day with medicine doses, stool type over time, type mix, medicine timing (before / during / after a poop),
   vomiting (how often, and how often it follows Imodium or Gas-X), time of day, and weekly averages.
