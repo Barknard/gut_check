@@ -469,3 +469,222 @@ dialog::backdrop { background: rgba(0, 0, 0, .5); -webkit-backdrop-filter: blur(
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 .banner.picking { display: none; }
+
+
+/* =====================================================================
+   Bristol "plop": each type lands the way its consistency would.
+   --h = drop height, --d = delay (set from JS), --k = index of a part.
+   ===================================================================== */
+.b-opt { overflow: visible; }
+.b-opt::before { border-radius: 14px 0 0 14px; }
+.b-ico svg { overflow: visible; }
+.plop .b-ico svg, .plop .lump, .plop .blob, .plop .drop, .plop .puddle, .plop .wave { transform-box: fill-box; transform-origin: 50% 100%; }
+.plop[data-b="1"] .lump { animation: pebble .95s both; animation-delay: calc(var(--d, 0ms) + var(--k) * 60ms); }
+.plop[data-b="2"] .b-ico svg { animation: lumpy .9s both var(--d, 0ms); }
+.plop[data-b="3"] .b-ico svg { animation: thud .85s both var(--d, 0ms); }
+.plop[data-b="4"] .b-ico svg { animation: slither 1s both var(--d, 0ms); }
+.plop[data-b="5"] .blob { animation: jelly 1s both; animation-delay: calc(var(--d, 0ms) + var(--k) * 70ms); }
+.plop[data-b="6"] .b-ico svg { animation: splat 1.15s both var(--d, 0ms); }
+.plop[data-b="7"] .drop { animation: drip .8s both; animation-delay: calc(var(--d, 0ms) + var(--k) * 90ms); }
+.plop[data-b="7"] .puddle { transform-origin: 50% 50%; animation: spread .9s both; animation-delay: calc(var(--d, 0ms) + 120ms); }
+.plop[data-b="7"] .wave { transform-origin: 50% 50%; animation: wave 1s both; animation-delay: calc(var(--d, 0ms) + 200ms); }
+
+/* 1 hard lumps: rigid pebbles that clatter and bounce */
+@keyframes pebble {
+  0% { transform: translateY(var(--h, -46px)); opacity: 0; animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  8% { opacity: 1; }
+  38% { transform: translateY(0); animation-timing-function: cubic-bezier(0, .55, .45, 1); }
+  54% { transform: translateY(-14px); animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  68% { transform: translateY(0); animation-timing-function: cubic-bezier(0, .55, .45, 1); }
+  77% { transform: translateY(-5px); animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  86%, 100% { transform: translateY(0); } }
+/* 2 lumpy log: one small bounce and a wobble */
+@keyframes lumpy {
+  0% { transform: translateY(var(--h, -46px)); opacity: 0; animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  8% { opacity: 1; }
+  40% { transform: translateY(0) scale(1.05, .9); animation-timing-function: ease-out; }
+  55% { transform: translateY(-6px) scale(.98, 1.03) rotate(-2.5deg); animation-timing-function: ease-in; }
+  68% { transform: translateY(0) scale(1.02, .97) rotate(1.5deg); }
+  82% { transform: rotate(-.6deg); }
+  100% { transform: none; } }
+/* 3 cracked log: heavy thud, small squash, a shudder */
+@keyframes thud {
+  0% { transform: translateY(var(--h, -46px)); opacity: 0; animation-timing-function: cubic-bezier(.6, 0, 1, .4); }
+  8% { opacity: 1; }
+  42% { transform: translateY(0) scale(1.07, .85); animation-timing-function: ease-out; }
+  56% { transform: scale(.98, 1.04); }
+  64% { transform: translateX(-1.6px); } 72% { transform: translateX(1.6px); } 80% { transform: translateX(-.8px); }
+  90%, 100% { transform: none; } }
+/* 4 smooth snake: soft landing, squish, slither */
+@keyframes slither {
+  0% { transform: translateY(var(--h, -46px)) rotate(-7deg); opacity: 0; animation-timing-function: cubic-bezier(.5, 0, .9, .5); }
+  8% { opacity: 1; }
+  40% { transform: translateY(0) scale(1.12, .8); animation-timing-function: ease-out; }
+  56% { transform: scale(.95, 1.07); }
+  70% { transform: scale(1.03, .97) skewX(-6deg); }
+  84% { transform: skewX(4deg); }
+  100% { transform: none; } }
+/* 5 soft blobs: jelly jiggle */
+@keyframes jelly {
+  0% { transform: translateY(var(--h, -46px)); opacity: 0; animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  8% { opacity: 1; }
+  38% { transform: translateY(0) scale(1.28, .7); animation-timing-function: ease-out; }
+  52% { transform: translateY(-3px) scale(.86, 1.18); }
+  66% { transform: translateY(0) scale(1.12, .9); }
+  78% { transform: scale(.95, 1.06); }
+  90% { transform: scale(1.03, .98); }
+  100% { transform: none; } }
+/* 6 mushy: splats wide, oozes slowly back */
+@keyframes splat {
+  0% { transform: translateY(var(--h, -46px)) scale(.85, 1.2); opacity: 0; animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  8% { opacity: 1; }
+  34% { transform: translateY(0) scale(1.45, .5); animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
+  60% { transform: scale(1.2, .78); }
+  80% { transform: scale(1.08, .9); }
+  100% { transform: none; } }
+/* 7 watery: drips fall, puddle spreads, ripples */
+@keyframes drip {
+  0% { transform: translateY(var(--h, -40px)) scale(.8, 1.5); opacity: 0; animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  10% { opacity: 1; }
+  50% { transform: translateY(0) scale(.9, 1.3); animation-timing-function: ease-out; }
+  66% { transform: scale(1.35, .65); }
+  82% { transform: scale(.95, 1.06); }
+  100% { transform: none; } }
+@keyframes spread {
+  0% { transform: scale(.2, .4); opacity: 0; }
+  25% { opacity: 1; }
+  60% { transform: scale(1.14, 1.08); animation-timing-function: ease-in-out; }
+  80% { transform: scale(.97, 1); }
+  100% { transform: none; } }
+@keyframes wave { 0%, 35% { opacity: 0; transform: scaleX(.4); } 100% { opacity: 1; transform: none; } }
+
+/* the chosen one takes the spotlight */
+.bristol-grid.chosen .b-opt:not(.is-chosen) { opacity: .3; transform: scale(.97); transition: opacity .3s, transform .3s; }
+.b-opt.is-chosen { transform: scale(1.03); box-shadow: var(--lit), 0 0 0 2px var(--bc), 0 18px 36px -14px var(--bc); transition: transform .4s var(--ease-spring), box-shadow .3s; z-index: 2; }
+.b-opt.is-chosen .b-ico { filter: drop-shadow(0 8px 6px rgba(0, 0, 0, .55)); }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* =====================================================================
+   Real 3D. Interactive parts are physical slabs: a lit face, a side wall
+   you can see (in the item's own color), and a contact shadow. Pressing
+   pushes the slab down its own thickness. Slabs tilt in true perspective
+   toward the finger (JS sets --rx/--ry), a specular highlight follows the
+   touch (--lx/--ly), and icons float above the face (translateZ), so
+   they shift against it as it tilts. On Android, the home grid also
+   tilts with the phone (--gx/--gy).
+   ===================================================================== */
+#view-home { perspective: 1100px; perspective-origin: 50% 20%; }
+.kpis, .actions { transform-style: preserve-3d; transform: rotateX(calc(var(--gy, 0) * -7deg)) rotateY(calc(var(--gx, 0) * 7deg)); transition: transform .25s linear; }
+.actions { perspective: 900px; gap: 14px 12px; }
+.kpis { margin-bottom: 22px; }
+
+/* --- the four action keys --- */
+.act {
+  --depth: 9px; --p: 0px;
+  overflow: visible; isolation: auto; transform-style: preserve-3d;
+  transform: translateY(var(--p)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  background:
+    radial-gradient(130% 95% at var(--lx, 50%) var(--ly, 0%), rgba(255, 255, 255, .14), transparent 58%),
+    linear-gradient(180deg, #2c2c29, #1c1c1a 70%);
+  border: 1px solid rgba(255, 255, 255, .09);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .16), inset 0 -3px 0 rgba(0, 0, 0, .3),
+    0 calc(var(--depth) - var(--p)) 0 0 color-mix(in srgb, var(--c) 38%, #0a0a09),
+    0 calc(var(--depth) - var(--p)) 0 1px rgba(0, 0, 0, .55),
+    0 calc(var(--depth) + 16px - var(--p) * 1.6) 22px -6px rgba(0, 0, 0, .8);
+  transition: transform .55s var(--ease-spring), box-shadow .22s var(--ease-out);
+}
+.act::before, .act::after { display: none; }
+.act:active, .act.tilting:active { --p: 6px; transition: transform .12s ease-out, box-shadow .12s ease-out; background-color: transparent; }
+.act .fx { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
+.act .fx .ripple { z-index: 0; }
+.act-ico { transform: translateZ(30px); filter: drop-shadow(calc(var(--tx, 0) * -1.2px) calc(9px + var(--ty, 0) * -1.2px) 6px rgba(0, 0, 0, .6)); transition: transform .5s var(--ease-spring), filter .2s; }
+.act-label { transform: translateZ(14px); text-shadow: 0 2px 3px rgba(0, 0, 0, .6); }
+.act:active .act-ico { transform: translateZ(22px) scale(.97); }
+.act.pop .act-ico { animation: pop3d .65s var(--ease-spring); }
+@keyframes pop3d { 0% { transform: translateZ(30px); } 30% { transform: translateZ(18px) scale(1.2, .85); } 58% { transform: translateZ(46px) scale(.93, 1.1) rotate(-4deg); } 100% { transform: translateZ(30px); } }
+.float-ok { transform: translateZ(50px); }
+
+/* --- summary tiles --- */
+.kpis { perspective: 900px; }
+.kpi { overflow: visible; transform-style: preserve-3d; transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transition: transform .6s var(--ease-spring);
+  background: radial-gradient(130% 100% at var(--lx, 30%) var(--ly, 0%), rgba(255, 255, 255, .1), transparent 60%), linear-gradient(180deg, #252523, #1a1a19);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 6px 0 0 #0c0c0b, 0 6px 0 1px rgba(0, 0, 0, .5), 0 20px 22px -10px rgba(0, 0, 0, .75); }
+.kpi::after { border-radius: inherit; }
+.kpi-val { transform: translateZ(18px); text-shadow: 0 3px 4px rgba(0, 0, 0, .55); }
+.kpi-label, .kpi-sub { transform: translateZ(8px); }
+
+/* --- keys: chips, buttons, the tab pill --- */
+.chip { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 3px 0 0 #0c0c0b, 0 3px 0 1px rgba(0, 0, 0, .45), 0 8px 10px -6px rgba(0, 0, 0, .7); transition: transform .3s var(--ease-spring), box-shadow .15s; }
+.chip.is-on { box-shadow: inset 0 1px 0 #fff, 0 3px 0 0 #8c8a82, 0 3px 0 1px rgba(0, 0, 0, .4), 0 8px 10px -6px rgba(0, 0, 0, .7); }
+.chip:active { transform: translateY(2px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 1px 0 0 #0c0c0b, 0 2px 4px -2px rgba(0, 0, 0, .6); }
+.ghost, .wz-next { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 4px 0 0 #0c0c0b, 0 4px 0 1px rgba(0, 0, 0, .45), 0 10px 14px -8px rgba(0, 0, 0, .7); }
+.ghost:active, .wz-next:active { transform: translateY(3px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 1px 0 0 #0c0c0b, 0 2px 4px -2px rgba(0, 0, 0, .6); }
+.big-go, .primary { transform-style: preserve-3d; transform: translateY(0) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  background: radial-gradient(120% 140% at var(--lx, 50%) var(--ly, 0%), #fff, #e4e2db 55%, #cfccc4);
+  box-shadow: inset 0 1px 0 #fff, inset 0 -2px 0 rgba(0, 0, 0, .1), 0 6px 0 0 #8c8a82, 0 6px 0 1px rgba(0, 0, 0, .45), 0 20px 22px -10px rgba(0, 0, 0, .75); }
+.big-go:active, .primary:active { transform: translateY(5px); box-shadow: inset 0 1px 0 #fff, 0 1px 0 0 #8c8a82, 0 3px 6px -2px rgba(0, 0, 0, .6); transition: transform .1s, box-shadow .1s; }
+.wz-next.primary-next { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 5px 0 0 #065c06, 0 5px 0 1px rgba(0, 0, 0, .45), 0 16px 18px -8px rgba(0, 0, 0, .7); }
+.wz-next.primary-next:active { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 1px 0 0 #065c06; }
+.danger.solid { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 5px 0 0 #5e120d, 0 5px 0 1px rgba(0, 0, 0, .45), 0 16px 18px -8px rgba(0, 0, 0, .7); }
+.danger.solid:active { transform: translateY(4px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 1px 0 0 #5e120d; }
+.banner button { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), 0 4px 0 0 #8a5d00, 0 10px 12px -6px rgba(0, 0, 0, .7); transition: transform .1s; }
+.banner button:active { transform: translateY(3px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), 0 1px 0 0 #8a5d00; }
+.tabs::before { background: linear-gradient(180deg, #45453f, #2d2d2a); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 3px 0 0 #121211, 0 6px 8px -2px rgba(0, 0, 0, .7); bottom: 6px; }
+.tabs { padding-bottom: 6px; }
+.tab { transform: translateY(-1px); }
+
+/* --- Bristol choices: tinted slabs that fall flat into place, then tilt under the finger --- */
+.bristol-grid { perspective: 1000px; gap: 10px; }
+.b-opt { --p: 0px; transform-style: preserve-3d; transform: translateY(var(--p)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  background: radial-gradient(120% 140% at var(--lx, 20%) var(--ly, 0%), rgba(255, 255, 255, .09), transparent 60%), linear-gradient(180deg, #252523, #1a1a19);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 calc(5px - var(--p)) 0 0 color-mix(in srgb, var(--bc) 40%, #0a0a09), 0 calc(5px - var(--p)) 0 1px rgba(0, 0, 0, .5), 0 16px 18px -10px rgba(0, 0, 0, .7);
+  transition: transform .5s var(--ease-spring), box-shadow .2s; }
+.b-opt:active { --p: 3px; }
+.b-ico { transform: translateZ(22px); }
+.picker:not([hidden]) .b-opt { transform-origin: 50% 0; animation: layDown .6s var(--ease-out) both; }
+@keyframes layDown { from { opacity: 0; transform: translateY(-8px) rotateX(-58deg); } to { opacity: 1; transform: none; } }
+.b-opt.is-chosen { transform: translateZ(26px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 0 0 2px var(--bc), 0 7px 0 0 color-mix(in srgb, var(--bc) 40%, #0a0a09), 0 28px 30px -12px rgba(0, 0, 0, .85); }
+
+/* --- wizard tiles and other surfaces are slabs too --- */
+.tile { transform-style: preserve-3d; transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transition: transform .5s var(--ease-spring), box-shadow .15s;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 5px 0 0 #0c0c0b, 0 5px 0 1px rgba(0, 0, 0, .45), 0 16px 18px -10px rgba(0, 0, 0, .7); }
+.tile .ti { transform: translateZ(18px); filter: drop-shadow(0 5px 4px rgba(0, 0, 0, .55)); }
+.tile:active { transform: translateY(3px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 2px 0 0 #0c0c0b; }
+.tile-main { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 5px 0 0 #0a4d14, 0 5px 0 1px rgba(0, 0, 0, .45), 0 16px 18px -10px rgba(0, 0, 0, .7); }
+.card, .rows, .dyk, .banner, .bk { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .09), 0 4px 0 0 #0d0d0c, 0 4px 0 1px rgba(0, 0, 0, .45), 0 16px 20px -12px rgba(0, 0, 0, .7); }
+.card, .day { margin-bottom: 16px; }
+.dyk { box-shadow: inset 0 1px 0 rgba(158, 197, 244, .2), 0 5px 0 0 #101826, 0 5px 0 1px rgba(0, 0, 0, .45), 0 18px 20px -12px rgba(0, 0, 0, .75); }
+.banner { box-shadow: inset 0 1px 0 rgba(250, 178, 25, .2), 0 4px 0 0 #2a2108, 0 16px 18px -12px rgba(0, 0, 0, .7); }
+.toast { box-shadow: inset 0 1px 0 #fff, 0 5px 0 0 #9c9a93, 0 5px 0 1px rgba(0, 0, 0, .4), 0 26px 30px -12px rgba(0, 0, 0, .85); }
+.taps li { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 3px 0 0 #0d0d0c; }
+.taps li::before { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), 0 2px 0 0 #8a5d00; }
+.journey button { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 3px 0 0 #0c0c0b; }
+.journey li.done button { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 3px 0 0 #065c06; }
+.journey li.now button { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 3px 0 0 #8a5d00; animation: none; }
+
+/* --- things arrive in 3D: cards flip up into place, dialogs swing in --- */
+@keyframes rise { from { opacity: 0; transform: perspective(900px) translateY(16px) rotateX(-24deg) scale(.98); } to { opacity: 1; transform: none; } }
+.enter .card, .enter .day, .enter .kpi, .enter .act, .enter .recent, .enter .dyk { transform-origin: 50% 0; }
+dialog[open] { animation: swing3d .55s var(--ease-spring); transform-origin: 50% 100%; }
+@keyframes swing3d { from { opacity: 0; transform: perspective(1100px) translateY(40px) rotateX(16deg) scale(.95); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .kpis, .actions { transform: none !important; }
+}
+.picker:not([hidden]) .b-opt { animation-delay: calc(var(--d, 120ms) - 120ms); }
+
+/* 3D fix-ups: one perspective per group, each slab tilts itself (no nested 3D contexts),
+   and the phone's tilt (--gx/--gy) is folded into every slab's own rotation. */
+.kpis, .actions { transform: none !important; transform-style: flat; }
+.act, .act:active, .act.tilting:active {
+  transform: translateY(var(--p)) rotateX(calc(var(--rx, 0deg) + var(--gy, 0) * -8deg)) rotateY(calc(var(--ry, 0deg) + var(--gx, 0) * 8deg)); }
+.kpi { transform: rotateX(calc(var(--rx, 0deg) + var(--gy, 0) * -8deg)) rotateY(calc(var(--ry, 0deg) + var(--gx, 0) * 8deg)); }
+.act.pop .act-ico { animation: pop3d .65s var(--ease-spring); }
+.act:active, .act.tilting:active { box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .16), inset 0 -3px 0 rgba(0, 0, 0, .3),
+    0 calc(var(--depth) - var(--p)) 0 0 color-mix(in srgb, var(--c) 38%, #0a0a09),
+    0 calc(var(--depth) - var(--p)) 0 1px rgba(0, 0, 0, .55),
+    0 calc(var(--depth) + 16px - var(--p) * 1.6) 22px -6px rgba(0, 0, 0, .8); }

@@ -80,8 +80,8 @@ const ICON = {
 };
 const hl = (cx, cy, r) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${BR2}" opacity=".75"/>`;
 const BICON = [null,
-  `<svg viewBox="0 0 80 48" aria-hidden="true">${[[13,31,7],[29,19,7.5],[44,33,6.5],[57,17,7],[68,34,6]].map(([x,y,r]) =>
-    `<circle cx="${x}" cy="${y}" r="${r}" fill="${BR}"/>${hl(x-2.2, y-2.4, r/3)}`).join('')}</svg>`,
+  `<svg viewBox="0 0 80 48" aria-hidden="true">${[[13,31,7],[29,19,7.5],[44,33,6.5],[57,17,7],[68,34,6]].map(([x,y,r], k) =>
+    `<g class="lump" style="--k:${k}"><circle cx="${x}" cy="${y}" r="${r}" fill="${BR}"/>${hl(x-2.2, y-2.4, r/3)}</g>`).join('')}</svg>`,
   `<svg viewBox="0 0 80 48" aria-hidden="true">${[[14,25,9.5],[24,21,10.5],[35,26,10],[46,21,10.5],[57,26,10],[67,23,9]].map(([x,y,r]) =>
     `<circle cx="${x}" cy="${y}" r="${r}" fill="${BR}"/>`).join('')}${[[13,21],[24,16],[35,22],[46,16],[57,22],[66,19]].map(([x,y]) => hl(x,y,2.4)).join('')}</svg>`,
   `<svg viewBox="0 0 80 48" aria-hidden="true"><rect x="6" y="13" width="68" height="22" rx="11" fill="${BR}"/>
@@ -91,15 +91,15 @@ const BICON = [null,
       <path d="M25 35 l2 -6"/><path d="M42 35 l-1 -5 l2 -2"/><path d="M56 35 l-2 -6"/></g></svg>`,
   `<svg viewBox="0 0 80 48" aria-hidden="true"><path d="M9 31 C21 9 33 41 47 23 S67 13 72 25" stroke="${BR}" stroke-width="14" fill="none" stroke-linecap="round"/>
     <path d="M12 26 C22 12 31 34 44 20" stroke="${BR2}" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/></svg>`,
-  `<svg viewBox="0 0 80 48" aria-hidden="true">${[[16,29,10,8],[39,21,11,8.5],[62,30,11,8]].map(([x,y,rx,ry]) =>
-    `<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="${BR}"/><ellipse cx="${x-3}" cy="${y-3.5}" rx="${rx/2.6}" ry="2" fill="${BR2}" opacity=".75"/>`).join('')}</svg>`,
+  `<svg viewBox="0 0 80 48" aria-hidden="true">${[[16,29,10,8],[39,21,11,8.5],[62,30,11,8]].map(([x,y,rx,ry], k) =>
+    `<g class="blob" style="--k:${k}"><ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="${BR}"/><ellipse cx="${x-3}" cy="${y-3.5}" rx="${rx/2.6}" ry="2" fill="${BR2}" opacity=".75"/></g>`).join('')}</svg>`,
   `<svg viewBox="0 0 80 48" aria-hidden="true"><path d="M10 31 l4 -8 l5 3 l3 -9 l6 4 l5 -6 l4 5 l7 -4 l3 6 l6 -2 l2 7 l6 1 l-3 6 l4 5 l-8 2 l-4 -3 l-6 4 l-5 -3 l-7 3 l-4 -4 l-8 2 l-2 -5 z"
     fill="#9c6a3a" stroke="#9c6a3a" stroke-width="3" stroke-linejoin="round"/>
     <path d="M18 27 l4 -3 l5 2 l5 -4 l5 3" stroke="${BR2}" stroke-width="2" fill="none" stroke-linecap="round" opacity=".9"/>
     <path d="M71 18 l3 -3 l3 3 l-2 3 z M8 18 l3 -2 l2 3 l-3 2 z" fill="#9c6a3a" stroke="#9c6a3a" stroke-width="2" stroke-linejoin="round"/></svg>`,
-  `<svg viewBox="0 0 80 48" aria-hidden="true"><ellipse cx="40" cy="36" rx="33" ry="8.5" fill="#a0743f" opacity=".9"/>
-    <path d="M18 36 q5 -3 10 0 t10 0 M44 37 q5 -3 10 0 t10 0" stroke="#c8995f" stroke-width="2" fill="none" stroke-linecap="round"/>
-    ${[[22,10],[40,4],[58,12]].map(([x,y]) => `<path d="M${x} ${y} c-4 6 -5 10 0 11 c5 -1 4 -5 0 -11 z" fill="#a0743f"/>`).join('')}</svg>`,
+  `<svg viewBox="0 0 80 48" aria-hidden="true"><ellipse class="puddle" cx="40" cy="36" rx="33" ry="8.5" fill="#a0743f" opacity=".9"/>
+    <path class="wave" d="M18 36 q5 -3 10 0 t10 0 M44 37 q5 -3 10 0 t10 0" stroke="#c8995f" stroke-width="2" fill="none" stroke-linecap="round"/>
+    ${[[22,10],[40,4],[58,12]].map(([x,y], k) => `<path class="drop" style="--k:${k}" d="M${x} ${y} c-4 6 -5 10 0 11 c5 -1 4 -5 0 -11 z" fill="#a0743f"/>`).join('')}</svg>`,
 ];
 const iconFor = e => e.ev === 'poop' && e.b ? BICON[e.b] : ICON[e.ev];
 
@@ -827,8 +827,12 @@ function log(ev, b = null, ts = Date.now()) {
 let pickAgo = 0;
 function openPicker() {
   pickAgo = 0; $$('#when .chip').forEach(c => c.classList.toggle('is-on', c.dataset.ago === '0'));
+  if (motionOK()) $$('.b-opt').forEach((o, i) => { o.style.setProperty('--d', `${120 + i * 70}ms`); o.style.removeProperty('--h'); plop(o); });
   $('#actions').hidden = true; $('#recent').hidden = true; $('#kpis').hidden = true; $('#dyk').classList.add('picking'); $('#banner').classList.add('picking'); $('#picker').hidden = false; scrollTo(0, 0); buzz();
 }
+// restart the consistency-based "plop" on one Bristol choice
+function plop(el) { el.classList.remove('plop'); void el.offsetWidth; el.classList.add('plop'); }
+let pickBusy = false;
 function closePicker() { $('#actions').hidden = false; $('#recent').hidden = false; $('#kpis').hidden = false; $('#dyk').classList.remove('picking'); $('#banner').classList.remove('picking'); $('#picker').hidden = true; }
 
 /* ---------- edit dialog ---------- */
@@ -1142,6 +1146,51 @@ const ILL = {
     ${[[30, 20, '#fab219'], [250, 30, '#e87ba4'], [140, 24, '#6da7ec'], [262, 120, '#5fd35f'], [24, 120, '#d95926'], [150, 130, '#fab219']].map(([x, y, c]) => `<circle class="conf" cx="${x}" cy="${y}" r="4" fill="${c}"/>`).join('')}`, 'All set'),
 };
 
+/* ---------- real 3D: slabs tilt toward the finger, light follows it, Android tilts with the phone ---------- */
+const TILT = '.act, .b-opt, .tile, .kpi, .big-go';
+const TILT_MAX = el => el.matches('.act') ? 13 : el.matches('.kpi') ? 16 : 7; // degrees
+let tiltEl = null, hoverEl = null;
+function setTilt(el, e, scale = 1) {
+  const r = el.getBoundingClientRect();
+  const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+  const m = TILT_MAX(el) * scale, st = el.style;
+  st.setProperty('--rx', `${((.5 - y) * m).toFixed(2)}deg`);   // touch the top edge and it sinks
+  st.setProperty('--ry', `${((x - .5) * m).toFixed(2)}deg`);
+  st.setProperty('--lx', `${(x * 100).toFixed(1)}%`); st.setProperty('--ly', `${(y * 100).toFixed(1)}%`);
+  st.setProperty('--tx', ((x - .5) * 8).toFixed(2)); st.setProperty('--ty', ((y - .5) * 8).toFixed(2));
+}
+function clearTilt(el) { if (!el) return; ['--rx', '--ry', '--tx', '--ty', '--lx', '--ly'].forEach(k => el.style.removeProperty(k)); el.classList.remove('tilting'); }
+function wireTilt() {
+  if (!motionOK()) return;
+  document.addEventListener('pointerdown', e => {
+    const el = e.target.closest(TILT); if (!el) return;
+    if (hoverEl && hoverEl !== el) { clearTilt(hoverEl); hoverEl = null; }
+    tiltEl = el; el.classList.add('tilting'); setTilt(el, e);
+  }, { passive: true });
+  document.addEventListener('pointermove', e => {
+    if (tiltEl) return setTilt(tiltEl, e);
+    if (e.pointerType !== 'mouse') return;
+    const el = e.target.closest(TILT);
+    if (el !== hoverEl) { clearTilt(hoverEl); hoverEl = el; }
+    if (el) setTilt(el, e, .5); // gentler lean while hovering with a mouse
+  }, { passive: true });
+  const end = () => { if (tiltEl && tiltEl !== hoverEl) clearTilt(tiltEl); tiltEl = null; };
+  ['pointerup', 'pointercancel'].forEach(t => document.addEventListener(t, end, { passive: true }));
+  document.addEventListener('pointerleave', () => { end(); clearTilt(hoverEl); hoverEl = null; });
+  // Android sends tilt without asking. iPhone only sends it after a permission prompt, which we never show
+  // just for looks, so there the grid simply stays still.
+  if ('DeviceOrientationEvent' in window) {
+    let base = null, raf = 0, gx = 0, gy = 0;
+    addEventListener('deviceorientation', e => {
+      if (e.beta == null || e.gamma == null) return;
+      if (!base) base = { b: e.beta, g: e.gamma };
+      base.b += (e.beta - base.b) * .02; base.g += (e.gamma - base.g) * .02; // slowly re-centers on how she holds it
+      gx = Math.max(-1, Math.min(1, (e.gamma - base.g) / 25)); gy = Math.max(-1, Math.min(1, (e.beta - base.b) / 25));
+      if (!raf) raf = requestAnimationFrame(() => { raf = 0; const st = document.documentElement.style; st.setProperty('--gx', gx.toFixed(3)); st.setProperty('--gy', gy.toFixed(3)); });
+    });
+  }
+}
+
 /* ---------- wire up ---------- */
 function init() {
   $$('[data-icon]').forEach(el => el.innerHTML = ICON[el.dataset.icon]);
@@ -1159,10 +1208,20 @@ function init() {
       if (!motionOK()) return;
       const r = b.getBoundingClientRect(), d = document.createElement('span');
       d.className = 'ripple'; d.style.left = (e.clientX - r.left) + 'px'; d.style.top = (e.clientY - r.top) + 'px';
-      b.appendChild(d); setTimeout(() => d.remove(), 800);
+      let fx = b.querySelector('.fx'); if (!fx) { fx = document.createElement('span'); fx.className = 'fx'; b.prepend(fx); }
+      fx.appendChild(d); setTimeout(() => d.remove(), 800);
     });
   });
-  $('#bristolGrid').onclick = e => { const b = e.target.closest('.b-opt'); if (!b) return; log('poop', +b.dataset.b, Date.now() - pickAgo * MIN); closePicker(); };
+  $('#bristolGrid').onclick = e => {
+    const b = e.target.closest('.b-opt'); if (!b || pickBusy) return;
+    const n = +b.dataset.b;
+    log('poop', n, Date.now() - pickAgo * MIN); // saved straight away; the plop is just for show
+    if (!motionOK()) return closePicker();
+    pickBusy = true; buzz();
+    $('#bristolGrid').classList.add('chosen'); b.classList.add('is-chosen');
+    b.style.setProperty('--d', '0ms'); b.style.setProperty('--h', '-70px'); plop(b);
+    setTimeout(() => { pickBusy = false; $('#bristolGrid').classList.remove('chosen'); b.classList.remove('is-chosen'); closePicker(); }, n === 6 ? 1150 : 950);
+  };
   $('#when').onclick = e => { const c = e.target.closest('.chip'); if (!c) return; pickAgo = +c.dataset.ago; $$('#when .chip').forEach(x => x.classList.toggle('is-on', x === c)); };
   $('#pickCancel').onclick = closePicker;
   $('#toastUndo').onclick = () => { const f = undoFn; undoFn = null; $('#toast').hidden = true; if (f) { f(); toast('Undone'); } };
@@ -1463,6 +1522,7 @@ function init() {
   setInterval(() => { if (!document.hidden) { renderKpis(entries()); renderRecent(entries()); renderBanner(); } }, 60e3);
   try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch {} // ask the browser not to clear app data
 
+  wireTilt();
   setTab(ui.tab);
   // reopen the linked phone file (if any) before the first save, so nothing lands in the wrong place
   let firstVisit = false, restoredN = 0;
