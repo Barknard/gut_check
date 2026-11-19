@@ -495,6 +495,15 @@ function windowStats(list, from, to) {
   const gaps = []; for (let i = 1; i < poops.length; i++) gaps.push(poops[i].ts - poops[i-1].ts);
   return { n: poops.length, perDay: poops.length / days, type: mean(poops.filter(p => p.b).map(p => p.b)), gap: mean(gaps), days };
 }
+let kpiPrev = null;
+function countUp(el, from, to, dec) {
+  if (!motionOK() || !isFinite(from) || !isFinite(to) || from === to) return;
+  const t0 = performance.now(), dur = 650, node = el.firstChild;
+  if (!node || node.nodeType !== 3) return;
+  const tick = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+    node.nodeValue = (from + (to - from) * e).toFixed(dec); if (k < 1) requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+}
 function renderKpis(list) {
   const now = Date.now(), cur = windowStats(list, now - 7 * DAY, now), prev = windowStats(list, now - 14 * DAY, now - 7 * DAY);
   const lastPoop = [...list].reverse().find(e => e.ev === 'poop');
@@ -505,6 +514,13 @@ function renderKpis(list) {
     <div class="kpi"><div class="kpi-label">Per day</div><div class="kpi-val">${list.length ? cur.perDay.toFixed(1) : '–'}</div><div class="kpi-sub">${trend}</div></div>
     <div class="kpi"><div class="kpi-label">Avg type</div><div class="kpi-val">${isFinite(cur.type) ? cur.type.toFixed(1) : '–'}<small>/7</small></div><div class="kpi-sub">${isFinite(cur.type) ? typeLabel(cur.type) : 'Bristol scale'}</div></div>
     <div class="kpi"><div class="kpi-label">Between</div><div class="kpi-val">${fmtDur(cur.gap)}</div><div class="kpi-sub">${lastPoop ? `last ${ago(lastPoop.ts)}` : 'avg gap'}</div></div>`;
+  const vals = $$('#kpis .kpi-val'), shown = vals.map(v => v.textContent);
+  if (kpiPrev) vals.forEach((v, k) => {
+    if (shown[k] === kpiPrev[k]) return;
+    v.classList.add('bump');
+    if (k < 2) countUp(v, parseFloat(kpiPrev[k]), parseFloat(shown[k]), 1);
+  });
+  kpiPrev = shown;
 }
 function renderRecent(list) {
   const last = ev => [...list].reverse().find(e => e.ev === ev);
@@ -779,12 +795,17 @@ function render() {
   if (ui.tab === 'trends') renderTrends(list);
   setStatus();
 }
+const motionOK = () => !matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Plays the "rise in" cascade on a view once; background saves re-render without it.
+function enter(el) { if (!el || !motionOK()) return; el.classList.remove('enter'); void el.offsetWidth; el.classList.add('enter'); clearTimeout(el._enterT); el._enterT = setTimeout(() => el.classList.remove('enter'), 1100); }
 function setTab(t) {
   ui.tab = t; save(K.ui, ui);
+  $('.tabs').style.setProperty('--i', ['home', 'history', 'trends'].indexOf(t)); // slides the lit pill
   $$('.tab').forEach(b => { b.classList.toggle('is-on', b.dataset.tab === t); b.setAttribute('aria-selected', b.dataset.tab === t); });
   $$('.view').forEach(v => v.classList.toggle('is-on', v.id === `view-${t}`));
   if (t !== 'home') closePicker();
   render();
+  enter($(`#view-${t}`));
 }
 
 /* ---------- logging ---------- */
@@ -800,14 +821,15 @@ function log(ev, b = null, ts = Date.now()) {
   const e = { id: newId(), ts: Math.floor(ts / 1000) * 1000, ev, b };
   queue({ op: 'add', e }); buzz();
   const btn = $(`.act[data-act="${ev}"]`); btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop');
+  if (motionOK()) { const f = document.createElement('span'); f.className = 'float-ok'; f.textContent = '✓'; btn.appendChild(f); setTimeout(() => f.remove(), 950); }
   toast(ev === 'poop' ? `💩 Type ${b} logged${ts < Date.now() - MIN ? ` at ${fmtTime(ts)}` : ''}` : `${EMOJI[ev]} ${EV[ev].label} logged at ${fmtTime(ts)}`, () => queue({ op: 'del', id: e.id }));
 }
 let pickAgo = 0;
 function openPicker() {
   pickAgo = 0; $$('#when .chip').forEach(c => c.classList.toggle('is-on', c.dataset.ago === '0'));
-  $('#actions').hidden = true; $('#recent').hidden = true; $('#kpis').hidden = true; $('#dyk').classList.add('picking'); $('#picker').hidden = false; scrollTo(0, 0); buzz();
+  $('#actions').hidden = true; $('#recent').hidden = true; $('#kpis').hidden = true; $('#dyk').classList.add('picking'); $('#banner').classList.add('picking'); $('#picker').hidden = false; scrollTo(0, 0); buzz();
 }
-function closePicker() { $('#actions').hidden = false; $('#recent').hidden = false; $('#kpis').hidden = false; $('#dyk').classList.remove('picking'); $('#picker').hidden = true; }
+function closePicker() { $('#actions').hidden = false; $('#recent').hidden = false; $('#kpis').hidden = false; $('#dyk').classList.remove('picking'); $('#banner').classList.remove('picking'); $('#picker').hidden = true; }
 
 /* ---------- edit dialog ---------- */
 let editing = null;
@@ -1131,7 +1153,15 @@ function init() {
   $('#editType').innerHTML = BRISTOL.slice(1).map((b, i) => `<option value="${i+1}">Type ${i+1}: ${b.name}</option>`).join('');
 
   $$('.tab').forEach(b => b.onclick = () => setTab(b.dataset.tab));
-  $$('.act').forEach(b => b.onclick = () => b.dataset.act === 'poop' ? openPicker() : log(b.dataset.act));
+  $$('.act').forEach(b => {
+    b.onclick = () => b.dataset.act === 'poop' ? openPicker() : log(b.dataset.act);
+    b.addEventListener('pointerdown', e => {
+      if (!motionOK()) return;
+      const r = b.getBoundingClientRect(), d = document.createElement('span');
+      d.className = 'ripple'; d.style.left = (e.clientX - r.left) + 'px'; d.style.top = (e.clientY - r.top) + 'px';
+      b.appendChild(d); setTimeout(() => d.remove(), 800);
+    });
+  });
   $('#bristolGrid').onclick = e => { const b = e.target.closest('.b-opt'); if (!b) return; log('poop', +b.dataset.b, Date.now() - pickAgo * MIN); closePicker(); };
   $('#when').onclick = e => { const c = e.target.closest('.chip'); if (!c) return; pickAgo = +c.dataset.ago; $$('#when .chip').forEach(x => x.classList.toggle('is-on', x === c)); };
   $('#pickCancel').onclick = closePicker;
@@ -1152,7 +1182,7 @@ function init() {
     openEdit(row.dataset.id);
   };
 
-  $('#range').onclick = e => { const c = e.target.closest('.chip'); if (!c) return; ui.range = +c.dataset.r; save(K.ui, ui); $$('#range .chip').forEach(x => x.classList.toggle('is-on', x === c)); render(); };
+  $('#range').onclick = e => { const c = e.target.closest('.chip'); if (!c) return; ui.range = +c.dataset.r; save(K.ui, ui); $$('#range .chip').forEach(x => x.classList.toggle('is-on', x === c)); render(); enter($('#view-trends')); };
   $$('#range .chip').forEach(x => x.classList.toggle('is-on', +x.dataset.r === ui.range));
 
   $('#editCancel').onclick = () => $('#editDlg').close();
