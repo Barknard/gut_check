@@ -72,13 +72,52 @@ To publish the site itself: in this repo, **Settings → Pages → Deploy from a
 
 Phones save the home-screen icon when the shortcut is first added and don't refresh it. If the shortcut was added before the site was working, or before the icon was updated, it keeps a generic icon. Remove the shortcut from the home screen, open the site in Safari or Chrome, refresh, and add it to the home screen again.
 
+## Production notes
+
+- **Works offline.** A service worker (`sw.js`) keeps a copy of the app. When online, the page is always fetched fresh first (3-second limit), so updates arrive on the next open. Versioned files are cached together, so an update never mixes old and new code.
+- **Security policy.** A Content-Security-Policy allows scripts only from this site and network calls only to `api.github.com` and Google Apps Script. There are no inline scripts and no referrer is sent. The Google Sheet link carries a 64-character secret key, and the script refuses any second claim.
+- **Never loses an entry.**
+  - Entries are saved before anything is drawn.
+  - Every change is queued per backup place until it lands.
+  - A daily copy is kept inside the app for 30 days.
+  - If stored data can't be read, it is set aside, never overwritten.
+  - A full phone storage shows a warning.
+  - Unexpected errors show a calm message and are kept in a short log (`gl.errors` in browser storage).
+- **Accessibility.**
+  - Every button has a label.
+  - Colors pass colorblind checks, and meaning never relies on color alone.
+  - Keyboard focus is outlined.
+  - All motion and 3D tilt switch off with the phone's "reduce motion" setting.
+
+## Development
+
+```
+npm install          # once: installs Playwright for the tests
+npx playwright install chromium
+npm test             # statistics, Google Sheet script, and end-to-end in a phone-sized browser
+npm run release      # bump the version (sw.js + index.html) before pushing a change to main
+```
+
+The end-to-end tests simulate Google and the phone's file picker. They cover:
+- first visit, logging, undo and delete;
+- Google Sheet setup, two phones saving at once, going offline and coming back;
+- the phone file, "Did you know?", Excel export and re-import, and Reset;
+- full storage, reduce motion, and opening with no internet;
+- that no page has script errors or security-policy violations.
+
+GitHub runs them on every push (`.github/workflows/test.yml`).
+
 ## Files
 
 ```
-index.html            page structure
-styles.css            dark, colorblind-safe theme
-app.js                logging, saving (phone file or GitHub), stats and charts
+index.html            page structure (+ security policy)
+styles.css            dark, colorblind-safe theme, 3D and motion
+app.js                logging, saving (phone, file, Google Sheet, GitHub), stats, charts, setup wizard
+sw.js                 offline support and clean updates
+google-sheet/Code.gs  the Google Apps Script that stores the log in a Sheet
 vendor/xlsx.*         SheetJS 0.18.5 (Apache-2.0), loaded only when an Excel file is used
 manifest.webmanifest  "Add to Home Screen" support
 icon.svg, icon-*.png  app icon
+tests/                automated tests (npm test)
+scripts/release.js    version bump
 ```

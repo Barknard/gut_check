@@ -5,6 +5,20 @@
 (() => {
 'use strict';
 
+/* ---------- safety net: any unexpected error is logged and reported kindly. Entries are saved
+   before anything is drawn, so an error on screen never means lost data. ---------- */
+let lastErrToast = 0;
+function reportError(err) {
+  const msg = String((err && (err.stack || err.message)) || err || 'Unknown error').slice(0, 500);
+  try { const log = JSON.parse(localStorage.getItem('gl.errors') || '[]'); log.push({ at: new Date().toISOString(), msg }); localStorage.setItem('gl.errors', JSON.stringify(log.slice(-20))); } catch {}
+  if (Date.now() - lastErrToast > 60e3) {
+    lastErrToast = Date.now();
+    try { toast('Something went wrong, but every entry is saved. If the app acts up, close and reopen it.'); } catch {}
+  }
+}
+addEventListener('error', e => reportError(e.error || e.message));
+addEventListener('unhandledrejection', e => reportError(e.reason));
+
 /* ---------- constants ---------- */
 const EV = {
   poop:    { label: 'Poop',    csv: 'Poop',    color: 'var(--poop)', hex: '#d95926' },
@@ -110,9 +124,18 @@ const iconFor = e => e.ev === 'poop' && e.b ? BICON[e.b] : ICON[e.ev];
  * received yet. A sync makes the target hold everything this phone has, and pulls in anything
  * new it holds (another phone, edits made in Excel). Only a delete made in this app ever
  * removes an entry, so nothing is lost by a missing or out-of-date copy. */
-const load = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
+const load = (k, d) => {
+  let v = null;
+  try { v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }
+  catch { try { if (v) localStorage.setItem(k + '.unreadable', v); } catch {} return d; } // keep a damaged value aside, never lose it
+};
 let wiping = false; // set while resetting the app, so nothing is written back afterwards
-const save = (k, v) => { if (wiping) return; try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+let storageFull = false;
+const save = (k, v) => {
+  if (wiping) return true;
+  try { localStorage.setItem(k, JSON.stringify(v)); if (k === K.snap) storageFull = false; return true; }
+  catch { if (k === K.snap) storageFull = true; return false; }
+};
 const fixEv = e => e && e.ev === 'miralax' ? { ...e, ev: 'imodium' } : e; // the Imodium button used to say MiraLAX
 const fixOp = o => o.op === 'add' ? { ...o, e: fixEv(o.e) } : o;
 
@@ -936,7 +959,7 @@ const ST = (() => {
   function welch(a, b) {
     if (a.length < 3 || b.length < 3) return null;
     const v1 = varOf(a) / a.length, v2 = varOf(b) / b.length, se = Math.sqrt(v1 + v2);
-    if (!se) return null;
+    if (!se) return mean(a) === mean(b) ? 1 : 1e-12; // no spread at all in either group: as strong as it gets
     const df = (v1 + v2) ** 2 / (v1 * v1 / (a.length - 1) + v2 * v2 / (b.length - 1));
     return tP((mean(a) - mean(b)) / se, df);
   }
@@ -1060,7 +1083,9 @@ function refreshPlaces() { $$('.places-box').forEach(el => el.innerHTML = places
 function renderBanner() {
   const el = $('#banner'); if (!el) return;
   const ts = targets(); let html = '';
-  if (!ts.length) {
+  if (storageFull) {
+    html = `<span><b>⚠ This phone's storage is full.</b> New entries may not be kept here.${ts.length ? ' They are still being saved to your other places.' : ' Set up a Google Sheet backup now.'}</span><button type="button" data-b="${ts.length ? 'settings' : 'wizard'}">${ts.length ? 'Check' : 'Set up'}</button>`;
+  } else if (!ts.length) {
     const lc = load(K.copy, 0);
     html = `<span><b>⚠ Only saved inside this app.</b> If the phone is lost or the browser is cleared, the log is gone.${lc ? ` Last copy saved ${ago(lc)}.` : ''}</span><button type="button" data-b="wizard">Set up a backup</button>`;
   } else if (ts.some(t => tstat[t]?.err === 'perm')) {
@@ -1522,6 +1547,12 @@ function init() {
   setInterval(() => { if (!document.hidden) { renderKpis(entries()); renderRecent(entries()); renderBanner(); } }, 60e3);
   try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch {} // ask the browser not to clear app data
 
+  $$('#wizDlg form, #wipeDlg form').forEach(f => f.addEventListener('submit', e => e.preventDefault()));
+  const ver = (document.querySelector('script[src*="app.js"]')?.getAttribute('src') || '').match(/v=(\w+)/);
+  $('#appVer').textContent = `Gut Check · version ${ver ? ver[1] : 'dev'}`;
+  // offline + clean updates (see sw.js). Skipped on plain http other than localhost.
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost'))
+    navigator.serviceWorker.register('sw.js').catch(reportError);
   wireTilt();
   setTab(ui.tab);
   // reopen the linked phone file (if any) before the first save, so nothing lands in the wrong place

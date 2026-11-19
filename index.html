@@ -10,12 +10,15 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Gut Check">
 <meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<!-- Only this site, GitHub's API and Google Apps Script may be contacted. No inline scripts. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://api.github.com https://script.google.com https://script.googleusercontent.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <title>Gut Check</title>
 <link rel="manifest" href="manifest.webmanifest?v=2">
 <link rel="icon" href="favicon-32.png?v=2" type="image/png" sizes="32x32">
 <link rel="icon" href="icon.svg?v=2" type="image/svg+xml">
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png?v=2">
-<link rel="stylesheet" href="styles.css?v=14">
+<link rel="stylesheet" href="styles.css?v=17">
 </head>
 <body>
 <div class="app">
@@ -137,13 +140,13 @@
       <div class="dlg-row wrap"><button type="button" class="danger" id="resetOpen">Delete all entries…</button><button type="button" class="danger" id="wipeOpen">Reset app (like new)…</button></div>
       <p class="hint"><b>Delete all entries</b> empties the log everywhere and keeps your setup. <b>Reset app</b> makes this phone forget everything, including where it saves, and starts over with the setup.</p>
     </fieldset>
-    <div class="dlg-row"><span class="grow"></span><button class="primary" value="close">Done</button></div>
+    <div class="dlg-row"><span class="app-ver" id="appVer"></span><span class="grow"></span><button class="primary" value="close">Done</button></div>
   </form>
 </dialog>
 
 <!-- Setup wizard: a picture-led journey to save the log somewhere safe -->
 <dialog id="wizDlg" class="wiz">
-  <form method="dialog" class="dlg" onsubmit="return false">
+  <form method="dialog" class="dlg">
     <div class="wz-top">
       <button type="button" class="wz-back" id="wzBack" aria-label="Back">‹ Back</button>
       <span class="grow"></span>
@@ -328,7 +331,7 @@
 
 <!-- Reset the whole app on this phone -->
 <dialog id="wipeDlg">
-  <form method="dialog" class="dlg" onsubmit="return false">
+  <form method="dialog" class="dlg">
     <h2>Reset the app?</h2>
     <p class="reset-text">This phone forgets <b>everything</b>: the log, the automatic backups, and where it saves. The app starts like new and shows the setup again.</p>
     <label class="check" id="wipeAlsoRow"><input type="checkbox" id="wipeAlso"> <span>Also delete every entry from <b id="wipePlaces"></b></span></label>
@@ -349,6 +352,6 @@
   </form>
 </dialog>
 
-<script src="app.js?v=14"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

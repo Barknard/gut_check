@@ -1,0 +1,13 @@
+{
+  "name": "gut-check",
+  "private": true,
+  "description": "A tiny phone-first tracker for poops (Bristol scale), vomiting, Imodium and Gas-X.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node tests/run.js",
+    "release": "node scripts/release.js"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}
